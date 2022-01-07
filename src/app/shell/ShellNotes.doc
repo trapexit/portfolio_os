@@ -1,0 +1,208 @@
+
+                              Shell Release Notes
+                              ===================
+
+12-Sep-94
+---------
+
+  - "SetVerbose on" is now slightly more verbose
+
+
+12-Aug-94
+---------
+
+  - Supports demand-loading of non-privileged objects. This makes the shell
+    the non-privileged counterpart to the operator. The shell now creates
+    a message port to accept service requests from the kernel, and calls
+    on the operator in non-privileged mode to perform the service.
+
+  - The shell now uses kprintf() instead of printf() when doing screen IO.
+    This speeds things up somewhat. It also makes the code smaller.
+
+
+25-Jul-94
+---------
+
+  - Now knows about Naviken CDs, and will launch $RunNavikenCD when such a
+    disk is detected.
+
+
+06-Jul-94
+---------
+
+  - Shrank minmem code to save many bytes in RAM and ROM
+
+  - Added memdebug.lib errors when in development mode
+
+
+15-Jun-94
+---------
+
+  - ROM-over-CD changes. This involves doing better sniffing of the origin
+    of the universe. The setting of $sysboot was removed as it is no longer
+    needed.
+
+
+21.10.785 (26-May-94)
+---------------------
+
+  - The shell now provides a mechanism to add error strings for system
+    components that can't do it themselves. When in development mode, the shell
+    now adds error strings for compressutils.lib, timerutils.lib, music.lib,
+    and Access.
+
+
+21.10.??? (25-May-94)
+---------------------
+
+  - Changed the errors that Access can return to conform to the standard
+    system error scheme. The numbers were previously pretty much random.
+
+
+21.10.729 (18-May-94)
+---------------------
+
+  - The UserPC value printed by the shell now really shows the user-mode PC
+    of the task, instead of showing the address of where the user-mode PC
+    is stored!
+
+  - $RunNoCD is now executed if no disk is present in the drive
+
+  - $RunVideoCD is now executed in addition to $RunPhotoCD when a non-3DO
+    data CD is detected.
+
+  - $RunUnknownCD is now executed if an unknown type of disk is currently in
+    the drive.
+
+
+21.10.632 (05-May-94)
+---------------------
+
+  - Substantially reduced the risk of the PS crashing. It now
+    scans the task list much quicker, thus reducing the risk of
+    having the list modified from under it.
+
+  - Any shell command accepting numerical input can now handle
+    $ to indicate the beginning of a hex number, in addition to
+    0x.
+
+
+21.10.627 (05-May-94)
+---------------------
+
+  - Reduced the size and increased the reliability of the MemMap
+    command. The global task list is now searched instead of the
+    separate waitQ and readyQ lists.
+
+
+21.10.621 (04-May-94)
+---------------------
+
+  - Fixed some potential holes in handling of thread termination, and
+    mac IO requests. This could only be a problem in development mode,
+    not in production mode.
+
+
+21.10.579 (02-May-94)
+---------------------
+
+  - Improved and expanded the output format of some internal commands
+
+
+21.10.553 (29-Apr-94)
+---------------------
+
+  - MemMap now produces more useful output.
+
+
+21.10.505 (28-Apr-94)
+---------------------
+
+  - Access is no longer part of the shell. It is now a separate
+    loadable module located in $tuners/access.tuner. It is
+    loaded on demand by the shell when needed, and unloaded
+    immediately after.
+
+
+21.10.446 (25-Apr-94)
+---------------------
+
+  - Added the new ShowError command. Give it a system error number, and
+    it displays the associated error string
+
+
+21.10.219 (30-Mar-94)
+---------------------
+
+  - Serial mode is now always on when using the non-development mode
+    shell
+
+  - The shell can now start threads instead of tasks. If a command-line ends
+    with @, the object is loaded and executed as a thread of the shell.
+    This will be used to run the eventbroker under the shell's task.
+
+  - The shell now takes advantage of the updated LoadProgram() in the file
+    system. It now tries to run files as AIFs first, and if that fails due
+    to a bad file format, it then tries to run the files as scripts. This
+    avoids extra useless disk access during boot up, and speeds up the
+    booting process.
+
+  - Ending a command-line with % tells the shell to explicitly run the
+    object as a script, and not bother to run it as an AIF. This is used
+    internally to launch the startopera script, and can be used to launch the
+    AppStartup script. This again avoids extra disk access to determine if the
+    file is indeed a script or an AIF.
+
+  - "verbose on" now causes new task/thread names, items, and
+    addresses to be printed.
+
+  - Fixed bug introduced a few versions ago with KillTask() getting confused
+    about not finding requested tasks.
+
+
+21.10.87 (23-Mar-94)
+--------------------
+
+  - Fixed incorrect handling of scripts < 64 bytes in size
+
+
+20.33.680 (17-Mar-94)
+---------------------
+
+  - If not in development mode, then the serial terminal mode is now
+    enabled. This should let us pear into production units.
+
+
+20.33.652 (16-Mar-94)
+---------------------
+
+  - Revamp of the shell UI. Most built-in commands now have descriptive
+    names as synonyms for the more terse command names, output of commands
+    has been improved and made consistent.
+
+  - Major source code cleanup.
+
+  - Changed access.h to not contain C++ comments.
+
+  - Before loading an executable, the shell now calls ScavengeMem() to try and
+    release as much of its memory as possible.
+
+  - Fixed bug where multiple queued requests for Access services would
+    not be handled correctly. The message port was not being drained whenever
+    a signel was received.
+
+  - The ROM version of the code is quite a bit smaller, since PrintError()
+    is used throughout.
+
+  - Raised minmem minimum.
+
+  - Shell includes serial support.
+
+  - Memory to hold script files is no longer allocated with MEMTYPE_STARTPAGE,
+    which should avoid some fragmentation.
+
+  - Overall memory use is reduced.
+
+  - Bugs in the handling of nested scripts have been fixed.
+
+  - Changed the prompt from "Mac-->" to "3DO-->"

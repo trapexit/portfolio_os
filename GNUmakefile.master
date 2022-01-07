@@ -1,0 +1,1764 @@
+# $Id: GNUmakefile.master,v 1.165 1995/01/03 22:24:25 peabody Exp $
+# GNUmakefile.master for all of Portfolio
+#
+# Copyright (c) 1992, 1993, The 3DO Company, Inc.
+# All rights reserved.
+# This document is proprietary and confidential
+#
+# This file contains the standard build targets and variable values
+# for building ARM objects, link libraries, folios and other ARM
+# executables, and copying the above (and more) into the proper
+# location in the release directory.
+#
+# It should be included at the bottom of the local GNUmakefile for
+# each package that uses standard rules and variables.
+#
+# ========================================================================
+#	Object Classes
+#
+# boot: bootable-cd/rom-over-cd modules
+#
+#	fs cacheing on
+#	external misc code
+#	optical link not supported
+#	debugger not supported
+#	/remote not supported
+#
+#	object files: *.bo
+#	executables: *.boot
+#
+# dev: development station modules
+#
+#	fs cacheing on
+#	external misc code
+#	optical link supported
+#	debugger supported
+#	/remote supported
+#
+#	object files: *.do
+#	executables: *.dev
+#
+# rom: rom execution modules
+#
+#	fs cacheing off
+#	misc code linked in
+#	optical link not supported
+#	debugger not supported
+#	/remote not supported
+#
+#	object files: *.ro
+#	executables: *.rom
+#
+# ========================================================================
+#	Default build target
+#
+# It is possible that no target has been defined before including this
+# file. If so, then we normally build the "all" target.
+#
+
+masterdefault: 		all
+
+# Some special flags are used to avoid rerunning of certain bulk
+# command lists. These targets are listed here.
+
+fakes=		.tree.here .tree.std .mark.here .pop.here .includes
+
+# Some targets should get built even if someone touches the
+# file of that name.
+
+.PHONY:		all devs install devinstall \
+		pop libs devlibs therest moredevs \
+		installincludes installlibs installtherest \
+		installdevlibs installmoredevs
+
+# Progress Monitoring
+#
+
+ifndef	SAYCMD
+SAYCMD=	echo
+endif
+ifndef	SAYPRG
+SAYPRG=	echo
+endif
+
+export	SAYCMD SAYPRG
+
+# If MARK_REL is set, everything at the top of the RCS tree will
+# be labelled with it. Do this only once, from the command line,
+# when doing the initial build for a release.
+
+# MARK_REL=
+export MARK_REL
+
+# If BUILD_REL is set, all RCS CO operations will get the
+# version marked with the specified release. If it is
+# not set, "most recent" versions of files will be used.
+# It should be set to the value used in MARK_REL during a release
+# build.
+
+ifndef BUILD_REL
+ifdef MARK_REL
+BUILD_REL=	${MARK_REL}
+endif
+endif
+export BUILD_REL
+
+# RELEASE is the name of the release in progress. It should be
+# advanced by editing this master file after each release has been
+# delivered; thus, between releases, it should be the name of the next
+# release to be built.
+
+ifndef RELEASE
+ifdef BUILD_REL
+RELEASE=	${BUILD_REL}
+else
+RELEASE=	under_construction
+endif
+endif
+export RELEASE
+
+# MARKFLAG controls how names are applied to releases. Normally we
+# just use "-n" so as to not override preexisting labels, but this can
+# be changed by specifying MARKFLAG in the environment or on the
+# command line.
+
+ifndef	MARKFLAG
+MARKFLAG=	-n
+endif
+
+# Sometimes we want to check out one release, and mark it with a
+# different name. Do this by specifying the old name in BUILD_REL and
+# the new name in MARK_REL.
+
+ifdef	BUILD_REL
+ifdef	MARK_REL
+ifneq (${BUILD_REL},${MARK_REL})
+PARENT_REL=${BUILD_REL}
+endif
+endif
+endif
+
+ifdef	MARK_REL
+SETMARK=	rcs ${MARKFLAG}${MARK_REL}':'${PARENT_REL}
+endif
+
+# RELEASEDIR is the top of the build tree under which constructed
+# objects will be placed. This can and should be set to the absolute
+# path name of the top of the build tree for a full build. It should
+# only be set to the group-wide tree if you *know* what you are going
+# to be tossing up to the main tree is OK for other engineers to be
+# using internally.
+
+# The fanciness with ".top" is just a set of symlinks that always get
+# us to the top of our build tree for complete builds, or to the top of
+# the reference release tree (usually /opera/under_construction) for
+# single-package builds.
+
+RELEASEDIR=	.top
+
+# It is often useful to know the real pathname of the directory in
+# which we are currently building. Use ${HERE}.
+
+HERE=		`/bin/pwd`
+
+# Some modules that get built into the system are prebuilt and just
+# need to be copied from a central location, ARCHIVEDIR.
+
+ARCHIVEDIR=	/opera/archive
+
+# Changes to support the PowerPC - kevinh
+#
+# We add a number of new build flags, but we want to keep this build
+# working on ARM.  Therefore we provide rational defaults...
+#
+# New build options
+#
+# CPU_ARM - for ARM
+# CPU_POWERPC - for PPC
+# CPU_POWERPC32 - 32 bit PPC family (601, 603, 602, 604)
+# CPU_POWERPC64 - 64 bit PPC family (620)
+# CPU_POWERPC602 - The 602
+# ASIC_OPERA - for Opera
+# ASIC_ANVIL - for Anvil
+# ASIC_BULLDOG - for Bulldog
+# SYSTEM_CART - Cartridge build
+# SYSTEM_CD - CD build
+
+# We try to be smart about recognizing the RS/6000, because we know it only
+# builds bulldog binaries.
+
+ifeq ($(shell uname -s), AIX)
+BULLDOG_TEAM=1
+endif
+
+ifdef BULLDOG_TEAM
+CPU_POWERPC = -DCPU_POWERPC
+CPU_POWERPC32 = -DCPU_POWERPC32
+ASIC_OPERA = -DASIC_OPERA		# We use pup
+SYSTEM_CD = -DSYSTEM_CD
+else
+CPU_ARM = -DCPU_ARM
+SYSTEM_CD = -DSYSTEM_CD
+ASIC_ANVIL = -DASIC_ANVIL		# Turn on ANVIL support by default
+endif
+
+# Many utilities used in the build process may be renamed or replaced
+# or moved to another location; by keeping their names here instead of
+# in the rules, it makes fixing us up easier.
+
+# Normally, use the new compiler.
+# To use the old compiler, switch
+# ARMCOMPBIN to /usr/local/armbin and
+# change ARMCC to $(ARMCOMPBIN)/ncc
+
+ifndef	ARMCOMPBIN
+ARMCOMPBIN=		/opera/arm1.61
+endif
+
+ifndef	ARMCC
+ARMCC=		$(ARMCOMPBIN)/armcc
+endif
+
+ifndef	ARMAS
+ARMAS=		$(ARMCOMPBIN)/armasm
+endif
+
+ifndef	ARMAR
+ARMAR=		$(ARMCOMPBIN)/armlib
+endif
+
+ifndef	ARMLD
+ARMLD=		$(ARMCOMPBIN)/armlink
+endif
+
+export ARMCC ARMAS ARMAR ARMLD
+
+ifdef CPU_POWERPC
+CC=		fakecc
+AS=		fakecc
+AR=		ar
+LD=		ld
+else
+CC=		${ARMCC}
+AS=		${ARMAS}
+AR=		${ARMAR}
+LD=		${ARMLD}
+endif
+
+# Misc. Arm development utilities are still
+# to be found in armbin, everywhere.
+# NOTE: the compilers in /usr/local/armbin
+# are not the most up-to-date.
+
+ARMBIN=	/usr/local/armbin
+
+ifndef	MAKEPRIV
+MAKEPRIV=	$(ARMBIN)/rsapriv.940602
+endif
+
+ifndef STRIP
+STRIP=		$(ARMBIN)/stripaif
+endif
+
+ifndef P2COMP
+P2COMP=		$(ARMBIN)/p2comp
+endif
+
+ifndef BUMPREV
+BUMPREV=	$(ARMBIN)/BumpRev
+endif
+
+LOCALBIN=	/usr/local/bin
+
+ifndef MODBIN
+ifdef CPU_POWERPC
+MODBIN=		fixup3do
+else
+MODBIN=		$(LOCALBIN)/modbin
+endif
+endif
+
+ADX=		${LOCALBIN}/adx
+RCSUPDATE=	${LOCALBIN}/rcsupdate
+RCSCHECK=	${LOCALBIN}/rcscheck
+
+# We even use macros for system utilities, because we might
+# want to add some flags.
+
+#MD=		/bin/mkdir -p
+MD=		/usr/local/bin/mkmacdir
+RM=		/bin/rm -f
+CP=		/bin/cp
+MV=		/bin/mv
+LN=		/bin/ln -s
+SLN=		/bin/ln -s
+HLN=		/bin/ln
+
+export	MD RM CP MV LN
+
+# The CO macro is used for checking things out; note the use of the
+# BUILD_REL variable here to force checkout a named revision if one
+# has been specified.
+
+COV=		co    -r${BUILD_REL} ${CO_OPTS}
+CO=		co -q -r${BUILD_REL} ${CO_OPTS}
+
+# This set of files assumes a more recent GNUMake than is available
+# currently in /usr/local. Also, we expand PAR into a paralell job
+# specifier for faster builds (when using local disk). Thus, when you
+# start at the top and say "gnumake PAR=4", the subdirectories are
+# built using a parallel build (in this case, four jobs wide).
+
+MAKE=		gmake ${PAR:%=-j %}
+
+# ========================================================================
+
+# The NOTHING macro is useful when you want to override a default
+# to be absolutely nothing. "FOO =" will not do it, as that really
+# makes the macro undefined. use "FOO= $(NOTHING)" and the defaults
+# will not be used.
+
+NOTHING=
+
+# ========================================================================
+#	Constructing CFLAGS
+
+# Hardware Options
+
+HWOPTS = $(ASIC_ANVIL) $(ASIC_OPERA) $(ASIC_BULLDOG) \
+	$(CPU_ARM) $(CPU_POWERPC) $(CPU_POWERPC32) $(CPU_POWERPC64) \
+	$(CPU_POWERPC602) $(SYSTEM_CD) $(SYSTEM_CART)
+
+# ARM C Compiler Option Summary
+# Think about PowerPC when you use these options... ;-)
+
+# -M	produce makefile dependencies
+# -W	supress all warnings
+# -Wa	disable "use of = in a condition context"
+# -Wd	disable "deprecated declaration foo() - give arg types"
+# -Wf	disable "inventing extern int foo()"
+# -Wn	disable "implicit narrowing cast"
+# -Wv	disable "implicit return in non-void context"
+# -bi	compile for big-endian hardware
+# -fa	check for data flow anomalies
+# -fc	enable "limited pcc" support
+# -fe	check that externs are unique in first six case-insensitive chars
+# -ff	do not embed function names in code area
+# -fh	check that externs are declared for use, and that all scoped statics are used.
+# -fi	intersperse '#include "file"' in listing files as appropriate
+# -fj	intersperse '#include <file>' in listing files as appropriate
+# -fk	use K&R search rules for include files
+# -fm	report preprocessor symbols defined but not used
+# -fp	report explicit casts of integers into pointers
+# -fu	listing text is before preprocessor, not after
+# -fv	report all unused declarations, including those from headers
+# -fw	allow string literals to be writable.
+# -fx	turn on extra warnings (short ints and enums)
+# -g	produce debug information
+# -gf	produce debug information for functions and global variables
+# -gl	produce debug information for each source line
+# -gv	produce debug information for all variables
+# -wp	do not warn about non-ANSI files in #include <foofile.h>
+#
+# -za1	no unaligned word load/stores
+# -zo   put each function in its own link area
+#
+# pragma stuff: mostly 0=no and 1=yes:
+# -zpa#	warn implicit fn decls	(default=1)
+# -zpc#	check_memory_accesses (default=0)
+# -zpd#	warn_deprecated (default=1)
+# -zpe#	continue_after_hash_error (default=0)
+# -zpi#	include_only_once (default=0)
+# -zpj#	optimize_crossjump (default=1)
+# -zpm#	optimize_multiple_loads (default=1)
+# -zpp#	profile (default=0; 2=statements)
+# -zps#	check_stack (check=0, nocheck=1; default=1)
+# -zpt#	force_top_level (default=0)
+# -zpv#	check_formats (default=0, printf=1, scanf=2)
+# -zpy#	side_effects (yes=0, no=1; default=1)
+# -zpz#	optimize_cse (default=1)
+
+ARMCFLAGS = -bi -fa -za1 -wp
+PPCCFLAGS = -qcpluscmt
+
+ifdef CPU_POWERPC
+CFLAGS=  	${CDEFS} ${CCDEBUG} ${CCOPTIMIZE} \
+		$(PPCCFLAGS) \
+		$(INCLUDES:%=-I%) \
+		${HWOPTS}
+else
+CFLAGS=  	${CDEFS} ${CCDEBUG} ${CCOPTIMIZE} \
+		$(ARMCFLAGS) \
+		${FF} ${ZPS} ${APCS} ${WA} ${ZO} \
+		$(INCLUDES:%=-J%) \
+		${HWOPTS}
+endif
+
+CFLAGSB= 	${CBDEFS} ${CFLAGS} -DBOOTABLECD	-DRUNTIME -DPRODUCTION
+CFLAGSD= 	${CDDEFS} ${CFLAGS} -DDEVELOPMENT
+CFLAGSR= 	${CRDEFS} ${CFLAGS} -DROMBUILD		-DRUNTIME -DPRODUCTION
+
+# CDEFS is the list of additional options that will be used in the
+# local directory when building; the default is nothing. Use this for
+# things like "-DARMC", "-DDEBUG=1", and so on, which you want to use
+# on both the development and runtime versions of your executables.
+#
+# ifndef CDEFS
+# CDEFS=
+# endif
+
+# CBDEFS is just like CDEFS but it is added when the bootable-cd
+# versions of objects are being created. NOTE: The -DBOOTABLECD
+# flag is forced on the CFLAGSB line (as are -DRUNTIME and
+# -DPRODUCTION for now, but these symbols are deprecated in favor of
+# using "not DEVELOPMENT").
+
+# ifndef CBDEFS
+# CBDEFS=
+# endif
+
+# CDDEFS is just like CDEFS but it is added when the development
+# versions of objects are being created. NOTE: The -DDEVELOPMENT
+# flag is forced on the CFLAGSD line.
+
+# ifndef CDDEFS
+# CDDEFS=
+# endif
+
+# CRDEFS is just like CDEFS but it is added when the runtime versions
+# of objects are being created. Note: -DROMBUILD is forced on the
+# CFLAGSR line (as are -DRUNTIME and -DPRODUCTION for now, but these
+# symbols are deprecated in favor of using "not DEVELOPMENT").
+
+# ifndef CRDEFS
+# CRDEFS=
+# endif
+
+ifndef	CCOPTIMIZE
+ifndef CPU_POWERPC
+CCOPTIMIZE=	-Otime
+else
+CCOPTIMIZE=	-O
+endif
+endif
+
+ifndef	FF
+FF=	-ff
+endif
+
+ifndef	ZPS
+ZPS=	-zps0
+endif
+
+# ZO is used to turn on the "-zo" flag, which makes each function into
+# its own link area. This is usually turned off, but should probably
+# be turned on for link libraries (it may save space elsewhere).
+# XXX- is there an analog in PowerPC land for this? If not, shouldn't
+# we simply make sure that our libraries are broken up into separate
+# files anyway?
+
+# ifndef ZO
+# ZO=
+# endif
+
+# INCLUDES controls where we get our included files from; note that
+# we grab ${INCS_TARG} as well. See below.
+# If the local GNUmakefile sets up LOCAL_INCLUDES, it is a list
+# of directories to be searched after the current directory and
+# the "./includes" directory.
+
+INCLUDES=	. includes ${LOCAL_INCLUDES} ${INCS_TARG}
+
+# ========================================================================
+#	Constructing SFLAGS
+
+ifdef CPU_ARM
+#
+# ARM assembler
+#
+
+SFLAGS=  	-bigend -Apcs 3/32bit${SWST} ${NOWARN} $(INCLUDES:%=-I%)
+
+SBSTD=		-PD "BOOTABLECD SETA 1" -PD "DEVELOPMENT SETA 0" -PD "ROMBUILD SETA 0"
+SDSTD=		-PD "BOOTABLECD SETA 0" -PD "DEVELOPMENT SETA 1" -PD "ROMBUILD SETA 0"
+SRSTD=		-PD "BOOTABLECD SETA 0" -PD "DEVELOPMENT SETA 0" -PD "ROMBUILD SETA 1"
+
+else
+#
+# PowerPC assembler
+#
+
+SFLAGS= -c
+
+SBSTD= -DBOOTABLECD=1 -DDEVELOPMENT=0 -DROMBUILD=0
+SDSTD= -DBOOTABLECD=0 -DDEVELOPMENT=1 -DROMBUILD=0
+SRSTD= -DBOOTABLECD=0 -DDEVELOPMENT=0 -DROMBUILD=1
+
+endif
+
+SFLAGSB=	${SFLAGS} ${SBDEFS} ${SBSTD}
+SFLAGSD=	${SFLAGS} ${SDDEFS} ${SDSTD}
+SFLAGSR=	${SFLAGS} ${SRDEFS} ${SRSTD}
+
+# Most assemblies use /SWST; disable this with
+# "SWST= ${NOTHING}".
+
+ifndef	SWST
+SWST=	/SWST
+endif
+
+# Most assemblies use -NOW; disable this with
+# "NOWARN= ${NOTHING}".
+
+ifndef	NOWARN
+NOWARN=	-NOW
+endif
+
+# ========================================================================
+#	Constructing LFLAGS
+
+ifdef CPU_ARM
+LFLAGS=  	${LDDEBUG} ${LTYPE} ${MAP} -B ${BASEADDR} ${RELOC}
+endif
+
+# Nearly every link produces AIF, but you can override this
+# using "target_LTYPE= -BIN".
+
+LTYPE=		${firstword ${$@_LTYPE} -AIF}
+
+# Most links link at address 0x0;
+# override this for any target using "target_BASE= 0xVALUE".
+
+BASEADDR=	${firstword ${$@_BASE} 0x0}
+
+# Most links use "-map" but this can be changed.
+# To use -MAP, use "MAP= -MAP"
+# to turn it off, use "MAP= ${NOTHING}"
+
+ifndef	MAP
+MAP=		-map
+endif
+
+# Most links use "-R"
+# to turn it off, use "RELOC= ${NOTHING}"
+
+ifndef	RELOC
+RELOC=		-R
+endif
+
+# ========================================================================
+#	Installation Target Directories
+
+# default example class
+ifndef EXAMPLE_CLASS
+EXAMPLE_CLASS=	misc
+endif
+
+EXAMPLE_TARG=	${RELEASEDIR}/examples/${EXAMPLE_CLASS}
+EXAMPLE_XTARG=	${RELEASEDIR}/examples/${EXAMPLE_CLASS}${EXAMPLE_XDIR:%=/%}
+INCS_TARG=	${RELEASEDIR}/includes
+TEST_TARG=	${RELEASEDIR}/testprograms
+UTIL_TARG=	${RELEASEDIR}/utils
+
+HDW_BTARG=	${RELEASEDIR}/bootablecd/hardware
+HDW_DTARG=	${RELEASEDIR}/developer/hardware
+HDW_RTARG=	${RELEASEDIR}/runtime/hardware
+LIBS_BTARG=	${RELEASEDIR}/bootablecd/libs
+LIBS_DTARG=	${RELEASEDIR}/developer/libs
+LIBS_RTARG=	${RELEASEDIR}/runtime/libs
+PGMS_BTARG=	${RELEASEDIR}/bootablecd/programs
+PGMS_DTARG=	${RELEASEDIR}/developer/programs
+PGMS_RTARG=	${RELEASEDIR}/runtime/programs
+
+# ========================================================================
+
+# STARTUPCODE defaults to cstartup.o. This can be overriden, usually to
+# threadstartup.o for executables that are to be started as a thread.
+#
+# You can use "target.dev_STARTUPCODE" and "target_STARTUPCODE"; this
+# rule choses the first word it sees.
+#
+ifndef STARTUPCODE
+STARTUPCODE=	${firstword ${$@_STARTUPCODE} ${${basename $@}_STARTUPCODE} cstartup.o}
+endif
+
+# LIBCRT0 is the list of files we tack onto the beginning of the link
+# that we get from the proper library directory.
+
+LIBCRT0=	${STARTUPCODE} copyright.o
+
+# Local .s files can be specified in LCRT0_SSRC, and their objects
+# will be placed first on the link line.
+
+LBCRT0=		${LCRT0_SSRC:%.s=%.bo}
+LDCRT0=		${LCRT0_SSRC:%.s=%.do}
+LRCRT0=		${LCRT0_SSRC:%.s=%.ro}
+
+BCRT0=		${LBCRT0} ${LIBCRT0:%=${RELEASEDIR}/bootablecd/libs/%}
+DCRT0=		${LDCRT0} ${LIBCRT0:%=${RELEASEDIR}/developer/libs/%}
+RCRT0=		${LRCRT0} ${LIBCRT0:%=${RELEASEDIR}/runtime/libs/%}
+
+# ${target_LIBS} specifies libraries on a per-target basis that are to
+# be linked at the end of the link line.
+# LINK_LIBS specifies libraries that are to be searched for all link
+# targets (after the per-target librarires).
+
+DOLINK_BLIBS=	${$@_LIBS:%.lib=${LIBS_BTARG}/%.lib} \
+		${LINK_BLIBS:%.lib=${LIBS_BTARG}/%.lib} \
+		${LINK_LIBS:%.lib=${LIBS_BTARG}/%.lib}
+DOLINK_DLIBS=	${$@_LIBS:%.lib=${LIBS_DTARG}/%.lib} \
+		${LINK_DLIBS:%.lib=${LIBS_DTARG}/%.lib} \
+		${LINK_LIBS:%.lib=${LIBS_DTARG}/%.lib}
+DOLINK_RLIBS=	${$@_LIBS:%.lib=${LIBS_RTARG}/%.lib} \
+		${LINK_RLIBS:%.lib=${LIBS_RTARG}/%.lib} \
+		${LINK_LIBS:%.lib=${LIBS_RTARG}/%.lib}
+DOLINK_ALIBS=	${$@_LIBS:%.lib=${LIBS_DTARG}/%.lib} \
+		${ARMBIN_LINK_LIBS:%.lib=${LIBS_DTARG}/%.lib} \
+		${LINK_DLIBS:%.lib=${LIBS_DTARG}/%.lib} \
+		${LINK_LIBS:%.lib=${LIBS_DTARG}/%.lib}
+
+# The user supplies RCSFILES for the list of files under RCS so we can
+# manipulate them (version marking, checkout, cleanup, printing, &c.)
+
+# We toss some of the files, where we know the names, in for free.
+
+REVRCS :=	${wildcard RCS/*.rev,v}
+REVFILES=	${REVRCS:RCS/%.rev,v=%.rev}
+
+RCSMORE=	${INCS_HERE} \
+		${INCS_DOWN:%=includes/%} \
+		${LOCAL_INCS} \
+		${LIB_DATE:%=%.c} \
+		${OTHERFILES} \
+		${DOCS} \
+		${DEPFILE} \
+		${REVFILES}
+
+RCSSORT=	${sort ${RCSFILES} ${RCSMORE}}
+HFILES=	${filter %.h, ${RCSSORT}}
+CFILES=	${filter %.c, ${RCSSORT}}
+SFILES=	${filter %.s, ${RCSSORT}}
+AFILES=	${filter %.a, ${RCSSORT}}
+IFILES=	${filter %.i, ${RCSSORT}}
+XFILES= ${filter-out %.h %.c %.s %.a %.i, ${RCSSORT}}
+
+ALLPROGS=	${HDW} ${PGMS} \
+		${LOCALS} ${DLOCALS} ${RLOCALS} \
+		${EXAMPLES} ${TESTS} ${UTILS} \
+		${BHDW} ${DHDW} ${RHDW} \
+		${BPGMS} ${DPGMS} ${RPGMS}
+
+NOROMS=		${filter-out %.rom, ${ALLPROGS}}
+DEVEXEC=	${filter %.dev, ${ALLPROGS}}
+ROMEXEC=	${filter %.rom, ${ALLPROGS}}
+ARMEXEC=	${filter %.arm, ${ALLPROGS}}
+TODEP=		${AUTODEPEND} ${EXAMPLES} \
+		${DEVEXEC} ${ROMEXEC} ${ARMEXEC} \
+		${LIBS} ${BLIBS} ${DLIBS} ${RLIBS} \
+		${EXAMPLE_LIBS} ${EXAMPLE_DLIBS}
+DEPSORT=	${sort	${TODEP:%=.dep.%}}
+
+# Most installations are done by removing the target, then copying the
+# source to the target. If you want to change this, change it here.
+
+copyit=		${RM} $@; ${CP} $< $@
+
+# Some installations are done by removing the target, then hard-
+# linking the source to the target. If you want to change this,
+# change it here. NOTE: ".top" may resolve to some place on another
+# file system, where a hardlink is not possible. If the link can not
+# be created, just copy the file.
+
+linkit=		${RM} $@; ${HLN} $< $@ || ${CP} $< $@
+
+ifneq (0, ${words ${LIB_DATE}})
+
+# If we have a datefile, ${ccdateD} and ${ccdateR} expand to the rules
+# to check out and compile this file.
+
+STDLIB_DATEFLAGS=-DWHATSTRING="\"`.top/scripts/genwhat.sh ${basename $@} $@ $(RELEASE)`\"" \
+		-DNOW="\"`date`\""  \
+		-DOPERAVERSION="\"$(RELEASE)\""
+
+ccldate=	[ -f ${LIB_DATE}.c ] || co -q -r ${LIB_DATE}.c; \
+		${CC} ${STDLIB_DATEFLAGS} ${LIB_DATEFLAGS} ${CFLAGS} -c -o ${LIB_DATE}.$@.o ${LIB_DATE}.c;
+rmldate=	; ${RM} ${LIB_DATE}.$@.o
+
+${LIB_DATE}.c:: ; [ -f ${LIB_DATE}.c ] || co -q -r ${LIB_DATE}.c
+
+endif
+
+# The standard rule for building a link library is ${linklib}; note
+# that the list of objects must be in ${target_OBJS}.
+
+ifdef CPU_POWERPC
+ARBITS=		rc $@
+else
+ARBITS=		-c -o $@
+endif
+
+linklib=	${ccldate} \
+		$(AR) $(ARBITS) ${LIB_DATE:%=%.$@.o} ${$@_OBJS} \
+		${rmldate}
+
+ifneq (0, ${words ${DATE}})
+
+# If we have a datefile, ${ccdateD} and ${ccdateR} expand to the rules
+# to check out and compile this file.
+
+STDDATEFLAGS=	-DWHATSTRING="\"`.top/scripts/genwhat.sh ${basename $@} $@ $(RELEASE)`\"" \
+		-DNOW="\"`date`\""  \
+		-DOPERAVERSION="\"$(RELEASE)\""
+
+ccdate=		${CC} ${STDDATEFLAGS} ${DATEFLAGS} ${CFLAGS} -c -o ${DATE}.$@.o .top/${DATE}.c;
+rmdate=		; ${RM} ${DATE}.$@.o
+
+.top/${DATE}.c:
+	(cd .top; co -q -r ${DATE}.c)
+
+endif
+
+ifndef MBTIME
+MBTIME=		-time now
+endif
+
+ifndef MBNAME
+MBNAME=		-name ${firstword ${$@_MODNAME} ${${basename $@}_MODNAME} ${basename $@}}
+endif
+
+ifndef	automodbin
+automodbin=	; ${MODBIN} $@ ${MBTIME} ${MBNAME} ${MBFLAGS} ${MBDEBUG} ${${basename $@}_MODBIN} ${$@_MODBIN} || exit 1
+endif
+
+modbin=		-@echo '*** $$''{modbin} can be removed from rule for $@ in '"`pwd`"
+
+# ${linkboot} links the current target using:
+#	${target_OBJS}	list of objects
+#	${target_LIBS}	per-target library files
+#	${LINK_LIBS}	global library files
+
+ifndef CPU_ARM
+linkboot=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -o $@ ${BCRT0} \
+			${$@_OBJS} ${DATE:%=%.$@.o} ${DOLINK_BLIBS} || \
+		exit 1 \
+		${rmdate}
+else
+linkboot=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -S $@.sym -o $@ ${BCRT0} \
+			${$@_OBJS} ${DATE:%=%.$@.o} ${DOLINK_BLIBS} | tee $@.map || \
+		exit 1 \
+		${automodbin} \
+		${rmdate}
+endif
+
+# ${linkdev} links the current target using:
+#	${target_OBJS}	list of objects
+#	${target_LIBS}	per-target library files
+#	${LINK_LIBS}	global library files
+
+ifndef CPU_ARM
+linkdev=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -o $@ ${DCRT0} \
+			${$@_OBJS} ${DATE:%=%.$@.o} ${DOLINK_DLIBS} || \
+		exit 1 \
+		${rmdate}
+else
+linkdev=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -S $@.sym -o $@ ${DCRT0} \
+			${$@_OBJS} ${DATE:%=%.$@.o} ${DOLINK_DLIBS} | tee $@.map || \
+		exit 1 \
+		${automodbin} \
+		${rmdate}
+endif
+
+# ${linkrom} is just like ${linkdev} but the runtime objects and
+# libraries are used instead of the development versions.
+
+ifndef CPU_ARM
+linkrom=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -o $@ ${RCRT0} \
+			${$@_OBJS} ${DATE:%=%.$@.o} ${DOLINK_RLIBS} || \
+		exit 1 \
+		${rmdate}
+else
+linkrom=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -S $@.sym -o $@ ${RCRT0} \
+			${$@_OBJS} ${DATE:%=%.$@.o} ${DOLINK_RLIBS} | tee $@.map || \
+		exit 1 \
+		${automodbin} \
+		${rmdate}
+endif
+
+# this is useful when the objects are on the dependency
+# line, and there is no ${whatever_OBJS} variable.
+
+ifndef CPU_ARM
+linkprog=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -o $@ ${DCRT0} \
+			$*.o ${DATE:%=%.$@.o} ${DOLINK_ALIBS} || \
+		exit 1 \
+		${rmdate}
+else
+linkprog=	${ccdate} \
+		${RM} $@; \
+		${LD} ${LFLAGS} -S $*.sym -o $@ ${DCRT0} \
+			$*.o ${DATE:%=%.$@.o} ${DOLINK_ALIBS} | tee $*.map || \
+		exit 1 \
+		${automodbin} \
+		${rmdate}
+endif
+
+# Include the ${compress} rule if you want to make the program into a
+# self-expanding compressed binary.
+
+ifdef	NO_COMPRESSION
+compress=	true
+else
+compress=	${RM} $@.uncompressed; ${MV} $@ $@.uncompressed; ${P2COMP} $@.uncompressed $@; ${RM} $@.tmp
+endif
+
+# Include ${stripaif} if you want to strip the AIF.
+
+stripaif=	${RM} $@.tmp; ${MV} $@ $@.tmp; ${STRIP} $@.tmp -o $@ -s $@.sym; ${RM} $@.tmp
+
+# Include ${setrev} if you have a "target.rev" file; this rule will
+# get it from RCS, and use modbin to set the version and revision of
+# the file.
+
+setrev=		${CO} ${basename $@}.rev; \
+		${MODBIN} $@ \
+			-version `head -1 ${basename $@}.rev` \
+			-revision `tail -1 ${basename $@}.rev`
+
+# Include ${setpriv} if the executable is to run in privileged mode.
+
+setpriv=	${RM} $@.raw; ${MV} $@ $@.raw; ${MAKEPRIV} $@.raw $@ priv
+
+# Include ${signit} if the executable merely has an RSA signature appended.
+
+signit=		${RM} $@.raw; ${MV} $@ $@.raw; ${MAKEPRIV} $@.raw $@ sign;
+
+# ========================================================================
+
+INCS_FROM_DOWN=	${INCS_DOWN:%=${INCS_TARG}/%}
+INCS_FROM_HERE=	${INCS_HERE:%=${INCS_TARG}/%}
+
+# ========================================================================
+
+# We must disable some built-in rules.
+%	: %.c
+%.s	: %.c
+
+# RCS File Management
+# -- We do not want to blindly update our local files
+#    when the RCS files change!
+
+# If you want to see the RCS diffs when a file is made obsolete by a
+# change checked into RCS, use this flag to gmake:
+#	gmake RCSCHECK_SHOW_DIFFS=true ...
+#
+# or, to make this semipermanent from your shell,
+#	setenv RCSCHECK_SHOW_DIFFS true		(csh, tcsh)
+#	export RCSCHECK_SHOW_DIFFS=true		(ksh, bash?)
+
+ifndef	RCSCHECK_SHOW_DIFFS
+RCSCHECK_SHOW_DIFFS=	false
+endif
+
+# To automatically update your files from RCS when RCS is
+# updated by someone else, use this flag to gmake:
+#	gmake RCSCHECK_AUTO_UPDATE=true ...
+#
+# or, to make this semipermanent from your shell,
+#	setenv RCSCHECK_AUTO_UPDATE true		(csh, tcsh)
+#	export RCSCHECK_AUTO_UPDATE=true		(ksh, bash?)
+
+ifndef	RCSCHECK_AUTO_UPDATE
+RCSCHECK_AUTO_UPDATE=	false
+endif
+
+# To stop the build when an out-of-date file is found and is
+# not updated, use this flag to gmake:
+#	gmake RCSCHECK_FAIL_STOPS=true ...
+#
+# or, to make this semipermanent from your shell,
+#	setenv RCSCHECK_FAIL_STOPS true		(csh, tcsh)
+#	export RCSCHECK_FAIL_STOPS=true		(ksh, bash?)
+
+ifndef	RCSCHECK_FAIL_STOPS
+RCSCHECK_FAIL_STOPS=	false
+endif
+
+# Some of the situations encountered in the RCS check are
+# not normally particularly interesting; for instance, a
+# file not existing, or a silent update. If you want to be
+# notified about these, use this flag to gmake:
+#	gmake RCSCHECK_VERBOSE=true ...
+#
+# or, to make this semipermanent from your shell,
+#	setenv RCSCHECK_VERBOSE true		(csh, tcsh)
+#	export RCSCHECK_VERBOSE=true		(ksh, bash?)
+
+ifndef	RCSCHECK_VERBOSE
+RCSCHECK_VERBOSE=	false
+endif
+
+# To disable the RCS check completely, use this flag to gmake:
+#	gmake RCSCHECK_DISABLE=true ...
+#
+# or, to make this semipermanent from your shell,
+#	setenv RCSCHECK_DISABLE true		(csh, tcsh)
+#	export RCSCHECK_DISABLE=true		(ksh, bash?)
+
+ifndef	RCS_VECHO
+RCS_VECHO=	true
+endif
+
+ifndef	RCSCHECK_DISABLE
+%	: RCS/%,v
+	@if   [ ! -f $@ ]									; \
+	 then if   ${RCSCHECK_VERBOSE}								; \
+	      then ${RCS_VECHO} "*** The file '$(HERE)/$@' does not exist,"			; \
+	           ${RCS_VECHO} "||| Retrieving it from RCS."					; \
+	           ${RCS_VECHO} "||| It may be missing from your RCSFILES variable."		; \
+	           ${COV} $@									; \
+	      else ${CO} $@									; \
+	      fi										; \
+	 else if   [ x"`readlink $@`" = x"" ]							; \
+	      then if   [ -w $@ ]								; \
+	           then if   ${RCSCHECK_VERBOSE}						; \
+	                then ${RCS_VECHO} "*** The RCS file for $(HERE)/$@ has been modified,"	; \
+			     ${RCS_VECHO} "||| but your copy of it is writable."		; \
+		        fi									; \
+		        touch -f $@								; \
+	           else if   rcsdiff -r${BUILD_REL} -c $@ >$@.delta 2>&1			; \
+		        then if   ${RCSCHECK_VERBOSE}						; \
+			     then ${RCS_VECHO} "*** The RCS file for $(HERE)/$@ was modified,"	; \
+			          ${RCS_VECHO} "||| but no changes to $(HERE)/$@ are required."	; \
+			     fi									; \
+			     touch -f $@							; \
+		        else echo "*** Your copy of $(HERE)/$@ has been obsoleted."		; \
+			     if   ${RCSCHECK_SHOW_DIFFS}					; \
+			     then echo "||| differences to $(HERE)/$@ follow:"			; \
+				  sed 's/^/||| /' <$@.delta					; \
+			     fi									; \
+			     if   ${RCSCHECK_AUTO_UPDATE}					; \
+			     then echo "*** updating $(HERE)/$@ from RCS"			; \
+				  ${COV} $@							; \
+			     else if   ${RCSCHECK_FAIL_STOPS}					; \
+				  then exit 1							; \
+				  fi								; \
+			     fi									; \
+			fi									; \
+			${RM} $@.delta								; \
+		   fi										; \
+	      fi										; \
+	 fi
+endif
+
+# Now, for our new pattern rules ... first, to build (see comment below):
+%.lst	: %.c ;	$(CC) $(CFLAGSD) -S $< -o $@
+
+%.o	: %.c ;	$(CC) $(CFLAGS)  -c $< -o $@
+%.bo	: %.c ;	$(CC) $(CFLAGSB) -c $< -o $@
+%.do	: %.c ;	$(CC) $(CFLAGSD) -c $< -o $@
+%.ro	: %.c ;	$(CC) $(CFLAGSR) -c $< -o $@
+
+%.o	: %.s ;	$(AS) $(SFLAGS)     $< -o $@
+%.bo	: %.s ;	$(AS) $(SFLAGSB)    $< -o $@
+%.do	: %.s ;	$(AS) $(SFLAGSD)    $< -o $@
+%.ro	: %.s ;	$(AS) $(SFLAGSR)    $< -o $@
+
+# WARNING: The above rules were used to derive rules in the filesystem
+#   GNUmakefile that are designed for building with BARF included.  If
+#   you change these rules, be sure to change the rules in
+#   src/filesystem/GNUmakefile similarly.  Apologies for this
+#   abomination, but this is how it has to be done until we can rework
+#   it after the Teamware conversion happens.
+
+# (and some oddball ones for dipir)
+%.ao	: %.c ; ${CC} ${CFLAGS} -c -DAPP_DIGEST $< -o $@
+%.xo	: %.c ; ${CC} ${CFLAGS} -c -DAPP_DIGEST -DCOMBINE $< -o $@
+%.to	: %.c ; ${CC} ${CFLAGS} -c -DAPP_DIGEST -DCOMBINE -DTESTBUILD $< -o $@
+
+# Rules for automagic generation of dependencies.  (See comment below.)
+
+.dep.%.o	: %.c ; $(CC) $(CFLAGS)  -c $< -o $*.o  -M > $@
+.dep.%.bo	: %.c ; $(CC) $(CFLAGSB) -c $< -o $*.bo -M > $@
+.dep.%.do	: %.c ; $(CC) $(CFLAGSD) -c $< -o $*.do -M > $@
+.dep.%.ro	: %.c ; $(CC) $(CFLAGSR) -c $< -o $*.ro -M > $@
+
+.dep.%.o	: %.s ; $(AS) $(SFLAGS)     $< -o $*.o  -D $@.raw >/dev/null 2>&1 && \
+			awk '{ for (f=2; f<=NF; ++f) printf "%s %s\n", $$1, $$f; }' < $@.raw > $@ && \
+			${RM} $@.raw
+
+.dep.%.bo	: %.s ; $(AS) $(SFLAGSB)    $< -o $*.bo -D $@.raw >/dev/null 2>&1 && \
+			awk '{ for (f=2; f<=NF; ++f) printf "%s %s\n", $$1, $$f; }' < $@.raw > $@ && \
+			${RM} $@.raw
+
+.dep.%.do	: %.s ; $(AS) $(SFLAGSD)    $< -o $*.do  -D $@.raw >/dev/null 2>&1 && \
+			awk '{ for (f=2; f<=NF; ++f) printf "%s %s\n", $$1, $$f; }' < $@.raw > $@ && \
+			${RM} $@.raw
+
+.dep.%.ro	: %.s ; $(AS) $(SFLAGSR)    $< -o $*.ro -D $@.raw >/dev/null 2>&1 && \
+			awk '{ for (f=2; f<=NF; ++f) printf "%s %s\n", $$1, $$f; }' < $@.raw > $@ && \
+			${RM} $@.raw
+
+# WARNING: The above rules were used to derive rules in the filesystem
+#   GNUmakefile that are designed for building with BARF included.  If
+#   you change these rules, be sure to change the rules in
+#   src/filesystem/GNUmakefile similarly.  Apologies for this
+#   abomination, but this is how it has to be done until we can rework
+#   it after the Teamware conversion happens.
+
+.dep.%.ao	: %.c ; ${CC} ${CFLAGS} -c -DAPP_DIGEST $< -o $*.ao -M > $@
+.dep.%.xo	: %.c ; ${CC} ${CFLAGS} -c -DAPP_DIGEST -DCOMBINE $< -o $*.xo -M > $@
+.dep.%.to	: %.c ; ${CC} ${CFLAGS} -c -DAPP_DIGEST -DCOMBINE -DTESTBUILD $< -o $*.to -M > $@
+
+.dep.%.arm: GNUmakefile.nodep
+	-@${RM} $*.arm $@
+	-@${MAKE} -f GNUmakefile.nodep -n $*.arm | \
+	  tr ' ' '\012' | \
+	  grep 'lib$$' | \
+	  sed 's/^/$*.arm: /' > $@
+ifdef DATE
+	-@echo $*'.arm: '${DATE:%=.top/%.c} >> $@
+endif
+
+.dep.%.boot: GNUmakefile.nodep
+	-@${RM} $*.rom $@
+	-@${MAKE} -f GNUmakefile.nodep -n $*.boot | \
+	  tr ' ' '\012' | \
+	  grep 'lib$$' | \
+	  sed 's/^/$*.boot: /' > $@
+ifdef DATE
+	-@echo $*'.boot: '${DATE:%=.top/%.c} >> $@
+endif
+
+.dep.%.dev: GNUmakefile.nodep
+	-@${RM} $*.dev $@
+	-@${MAKE} -f GNUmakefile.nodep -n $*.dev | \
+	  tr ' ' '\012' | \
+	  grep 'lib$$' | \
+	  sed 's/^/$*.dev: /' > $@
+ifdef DATE
+	-@echo $*'.dev: '${DATE:%=.top/%.c} >> $@
+endif
+
+ifdef	EXAMPLES
+${EXAMPLES:%=.dep.%}: .dep.%: GNUmakefile.nodep
+	-@${RM} $* $@
+	-@${MAKE} -f GNUmakefile.nodep -n $* | \
+	  tr ' ' '\012' | \
+	  grep 'lib$$' | \
+	  sed 's/^/$*: /' > $@
+ifdef DATE
+	-@echo $*': '${DATE:%=.top/%.c} >> $@
+endif
+endif
+
+.dep.%.rom: GNUmakefile.nodep
+	-@${RM} $*.rom $@
+	-@${MAKE} -f GNUmakefile.nodep -n $*.rom | \
+	  tr ' ' '\012' | \
+	  grep 'lib$$' | \
+	  sed 's/^/$*.rom: /' > $@
+ifdef DATE
+	-@echo $*'.rom: '${DATE:%=.top/%.c} >> $@
+endif
+
+.dep.%.lib: GNUmakefile.nodep
+	-@${RM} $@
+	-@echo '' > $@
+ifdef LIB_DATE
+	-@echo $*'.lib: '${LIB_DATE:%=%.c} >> $@
+endif
+
+.dep.%.blib: GNUmakefile.nodep
+	-@${RM} $@
+	-@echo '' > $@
+ifdef LIB_DATE
+	-@echo $*'.blib: '${LIB_DATE:%=%.c} >> $@
+endif
+
+.dep.%.dlib: GNUmakefile.nodep
+	-@${RM} $@
+	-@echo '' > $@
+ifdef LIB_DATE
+	-@echo $*'.dlib: '${LIB_DATE:%=%.c} >> $@
+endif
+
+.dep.%.rlib: GNUmakefile.nodep
+	-@${RM} $@
+	-@echo '' > $@
+ifdef LIB_DATE
+	-@echo $*'.rlib: '${LIB_DATE:%=%.c} >> $@
+endif
+
+%.doc: %.c; ${ADX} $< > $@
+
+# This is a fave over in audioland, so they can
+# generate arm binaries quickly from single C
+# and ASM source files.
+# Use "ARMBIN_LINK_LIBS" to list link libraries for .arm links.
+# Use "ARMBIN_MODBIN" for modbin arguments for .arm links.
+# NB: ${$@_MODBIN} overrides ${${basename $@}_MODBIN,
+# which overrides ${ARMBIN_MODBIN}, which
+# overrides all others. If there is no ARMBIN_MODBIN
+# then the other modbin flags are handled in ${linkprog}.
+%.arm   : %.o
+	${linkprog}
+ifdef ARMBIN_MODBIN
+	${MODBIN} $@ \
+		${ARMBIN_MODBIN} \
+		${${basename $@}_MODBIN} \
+		${$@_MODBIN}
+endif
+	${stripaif}
+
+# second, we have a *lot* of patterns to copy:
+
+# note that we must be very careful how we specify the rules for
+# copying include files, lest we install our include files based on
+# the ".o" dependencies when we are not doing install builds. This
+# happens when the automatic dependencies reference the copy of the
+# file in .top/includes, and there is a newer copy in the current
+# directory or the ./includes subdirectory.
+
+ifneq (0, ${words ${INCS_FROM_HERE}})
+${INCS_FROM_HERE}:	${INCS_TARG}/%	      :	%	      ;	${linkit}
+endif
+ifneq (0, ${words ${INCS_FROM_DOWN}})
+${INCS_FROM_DOWN}:	${INCS_TARG}/%	      :	includes/%    ;	${linkit}
+endif
+
+${EXAMPLE_XTARG}/%    :	%	      ; ${copyit}
+${EXAMPLE_TARG}/%     :	%	      ; ${copyit}
+${EXAMPLE_TARG}/%.lib :	%.dlib	      ; ${copyit}
+${HDW_BTARG}/%	      :	%	      ;	${copyit}
+${HDW_BTARG}/%	      :	%.boot	      ;	${copyit}
+${HDW_DTARG}/%	      :	%	      ;	${copyit}
+${HDW_DTARG}/%	      :	%.dev	      ;	${copyit}
+${HDW_RTARG}/%	      :	%	      ;	${copyit}
+${HDW_RTARG}/%	      :	%.rom	      ;	${copyit}
+${LIBS_BTARG}/%.lib   :	%.blib	      ;	${copyit}
+${LIBS_BTARG}/%.lib   :	%.lib	      ;	${copyit}
+${LIBS_BTARG}/%.o     :	%.o	      ;	${copyit}
+${LIBS_DTARG}/%.lib   :	%.dlib	      ;	${copyit}
+${LIBS_DTARG}/%.lib   :	%.lib	      ;	${copyit}
+${LIBS_DTARG}/%.o     :	%.o	      ;	${copyit}
+${LIBS_RTARG}/%.lib   :	%.lib	      ;	${copyit}
+${LIBS_RTARG}/%.lib   :	%.rlib	      ;	${copyit}
+${LIBS_RTARG}/%.o     :	%.ro	      ;	${copyit}
+${PGMS_BTARG}/%	      :	%	      ;	${copyit}
+${PGMS_BTARG}/%	      :	%.boot	      ;	${copyit}
+${PGMS_DTARG}/%	      :	%	      ;	${copyit}
+${PGMS_DTARG}/%	      :	%.dev	      ;	${copyit}
+${PGMS_RTARG}/%	      :	%	      ;	${copyit}
+${PGMS_RTARG}/%	      :	%.rom	      ;	${copyit}
+${RELEASEDIR}/doc/%   :	%	      ;	${copyit}
+${TEST_TARG}/%	      :	%	      ; ${copyit}
+${UTIL_TARG}/%	      :	%	      ; ${copyit}
+${UTIL_TARG}/%	      :	includes/%    ; ${copyit}
+
+# Specify "ONLOOPERR=true" if you want to continue
+# subdirectory builds when an error occurs.
+ONLOOPERR=		exit
+
+# This is how we recurse down to subdirectories.
+
+%.down: %.here
+	@true
+ifdef	BDIRS
+	@err=0; \
+	for d in ${BDIRS}; \
+	do	if test -d $$d; \
+		then	echo "--- building $* in $$d ---"; \
+			if ${MAKE} -C $$d $*; \
+			then	true; \
+			else	echo '###' build of $* in $$d failed '###'; \
+				err=1; \
+				${ONLOOPERR} $$err; \
+			fi; \
+		fi; \
+	done; exit $$err
+endif
+
+# ========================================================================
+#	.drop extension: build it, then drop it in dropbox.
+
+DROP=	.top/scripts/drop.sh
+
+%.drop: %
+	$(DROP) $*
+
+# ========================================================================
+#	prep		prepare for the build
+
+prep: .tree .mark .pop pop
+
+# ========================================================================
+# quick			build the world, no prep
+
+quick: libs therest
+	@true
+
+# ========================================================================
+# all			build the world, with prep
+
+all:  prep quick
+	@true
+
+# ========================================================================
+# quickdevs		build the development world, no prep
+
+quickdevs:  devlibs moredevs
+	@true
+
+# ========================================================================
+# devs			build the development world, with prep
+
+devs:  prep quickdevs
+	@true
+
+# ========================================================================
+# quickinstall:		build and install the world, no prep
+
+install.here:
+	@true
+quickinstall:  install.here installincludes installlibs installtherest
+	@true
+
+# ========================================================================
+# install:		build and install the world, with prep.
+
+install:  prep quickinstall
+	@true
+
+# ========================================================================
+# quickdevinstall:	build and install the development world, no prep.
+
+quickdevinstall:  installincludes installdevlibs installmoredevs
+	@true
+
+# ========================================================================
+# devinstall:		build and install the development world, with prep.
+
+devinstall:  prep quickdevinstall
+	@true
+
+# ========================================================================
+# .tree			generate the current subtree: packages hang
+#			dependencies off of .tree, usually either
+#			.includes or .tree.here depending on how
+#			complex their needs are.
+
+.tree.std:
+ifdef	BDIRS
+ifndef	NONSTANDARD_TREE
+	@${MD} ${BDIRS}
+	@for d in ${BDIRS} ; \
+	do	${RM}						$$d/.top ; \
+		${LN} ../.top					$$d/.top ; \
+		${RM}						$$d/RCS ; \
+		${LN} ../RCS/$$d				$$d/RCS ; \
+		${RM}						$$d/GNUmakefile.master ; \
+		${LN} ../GNUmakefile.master			$$d/GNUmakefile.master ; \
+	done
+ifdef	MARK_REL
+	@echo marking makefiles with ${MARK_REL}
+	-${SETMARK}		${BDIRS:%=%/GNUmakefile}
+	-@${SETMARK}		${BDIRS:%=%/.autodepends}
+endif
+	-@${CO}			${BDIRS:%=%/GNUmakefile}
+	-@${CO}			${BDIRS:%=%/.autodepends}
+endif
+endif
+	@touch $@
+.tree.here: .tree.std
+.tree: .tree.down
+	@true
+
+# ========================================================================
+# .includes		utility target for packages that have a local
+#			includes directory of the usual semantic.
+#		XXX- rerun only if ".includes" gets removed.
+
+.includes:
+	@${MD}						includes
+	@${RM}						includes/.top
+	@${LN} ../.top					includes/.top
+	@${RM}						includes/RCS
+	@${LN} /opera/RCS/developer/includes		includes/RCS
+	@touch $@
+
+
+# ========================================================================
+# .mark			mark top versions for this release
+#		XXX- rerun only if ".mark.here" gets removed.
+
+.mark.here:
+	@touch $@
+ifneq (0, ${words ${RCSSORT}})
+ifneq (0, ${words ${MARK_REL}})
+	@${SAYPRG} marking ${words ${RCSSORT}} files for release \"${MARK_REL}\"
+	-@${SETMARK} ${RCSSORT}
+endif
+endif
+
+.mark: .mark.down
+	@true
+
+# ========================================================================
+# .pop			bulk check out files (for this release)
+#		XXX- rerun only if ".pop.here" gets removed.
+
+.pop.here:
+	@touch $@
+ifneq (0, ${words ${RCSSORT}})
+	-@${CO} ${RCSSORT}
+endif
+
+.pop: .pop.down
+	@true
+
+# ========================================================================
+# pop			bulk check out files (for this release)
+
+pop.here: ${RCSSORT}
+	@true
+
+pop: pop.down
+	@true
+
+# ========================================================================
+# installincludes			put include files in place
+
+installincludes.here: ${INCS_DOWN:%=${INCS_TARG}/%} ${INCS_HERE:%=${INCS_TARG}/%}
+	@true
+
+installincludes: installincludes.down
+	@true
+
+# ========================================================================
+# devlibs		build development link libraries
+
+devlibs.here:	${LIBS} ${DLIBS} ${EXAMPLE_LIBS} ${EXAMPLE_DLIBS}
+	@true
+
+devlibs: devlibs.down
+	@true
+
+# ========================================================================
+# libs			build link libraries
+
+libs.here:	${LIBS} ${BLIBS} ${DLIBS} ${RLIBS} ${EXAMPLE_LIBS} ${EXAMPLE_DLIBS}
+	@true
+
+libs: libs.down
+	@true
+
+# ========================================================================
+# installdevlibs	build and install development link libraries
+
+installdevlibs.here:	${LIBS} ${DLIBS} ${EXAMPLE_LIBS} ${EXAMPLE_DLIBS} \
+			${LIBS:%=${LIBS_DTARG}/%} \
+			${DLIBS:%.dlib=${LIBS_DTARG}/%.lib} \
+			${EXAMPLE_LIBS:%=${EXAMPLE_TARG}/%} \
+			${EXAMPLE_DLIBS:%.dlib=${EXAMPLE_TARG}/%.lib}
+	@true
+
+installdevlibs: installdevlibs.down
+	@true
+
+# ========================================================================
+# installlibs		build and install link libraries
+
+installlibs.here:	${LIBS} ${DLIBS} ${BLIBS} ${RLIBS} ${EXAMPLE_LIBS} ${EXAMPLE_DLIBS} \
+			${LIBS:%=${LIBS_BTARG}/%} \
+			${LIBS:%=${LIBS_DTARG}/%} \
+			${LIBS:%=${LIBS_RTARG}/%} \
+			${BLIBS:%.blib=${LIBS_BTARG}/%.lib} \
+			${DLIBS:%.dlib=${LIBS_DTARG}/%.lib} \
+			${RLIBS:%.rlib=${LIBS_RTARG}/%.lib} \
+			${EXAMPLE_LIBS:%=${EXAMPLE_TARG}/%} \
+			${EXAMPLE_DLIBS:%.dlib=${EXAMPLE_TARG}/%.lib}
+	@true
+
+installlibs: installlibs.down
+	@true
+
+# ========================================================================
+# moredevs		build the other dev things
+
+moredevs.here: \
+		${HDW} ${PGMS} \
+		${LOCALS} ${DLOCALS} \
+		${EXAMPLES} ${TESTS} ${UTILS} \
+		${DHDW} ${DPGMS}
+	@true
+
+moredevs: moredevs.down
+	@true
+
+# ========================================================================
+# therest		build everything else
+
+therest.here: \
+		${HDW} ${PGMS} \
+		${LOCALS} ${BLOCALS} ${DLOCALS} ${RLOCALS} \
+		${EXAMPLES} ${TESTS} ${UTILS} \
+		${BHDW} ${DHDW} ${RHDW} \
+		${BPGMS} ${DPGMS} ${RPGMS}
+	@true
+
+therest: therest.down
+	@true
+
+# ========================================================================
+# installmoredevs	build and install the other dev things
+
+installmoredevs.here:	${HDW} ${DHDW} \
+			${PGMS} ${DPGMS} \
+			${EXAMPLES} ${TESTS} ${UTILS} \
+			${LOCALS} ${DLOCALS} \
+			${HDW:%=${HDW_DTARG}/%} \
+			${DHDW:%.dev=${HDW_DTARG}/%} \
+			${PGMS:%=${PGMS_DTARG}/%} \
+			${DPGMS:%.dev=${PGMS_DTARG}/%} \
+			${EXAMPLES:%=${EXAMPLE_XTARG}/%} \
+			${EXAMPLE_DATA:%=${EXAMPLE_XTARG}/%} \
+			${EXAMPLE_SRCS:%=${EXAMPLE_TARG}/%} \
+			${EXAMPLE_LIBS:%=${EXAMPLE_TARG}/%} \
+			${EXAMPLE_DLIBS:%.dlib=${EXAMPLE_TARG}/%.lib} \
+			${TESTS:%=${TEST_TARG}/%} \
+			${UTILS:%=${UTIL_TARG}/%} \
+			${DOCS:%=${RELEASEDIR}/doc/%}
+	@true
+
+installmoredevs: installmoredevs.down
+	@true
+
+# ========================================================================
+# installtherest	build and install everything else
+
+installtherest.here:	${HDW} ${BHDW} ${DHDW} ${RHDW} \
+			${PGMS} ${BPGMS} ${DPGMS} ${RPGMS} \
+			${LOCALS} ${DLOCALS} ${RLOCALS} \
+			${EXAMPLES} ${TESTS} ${UTILS} \
+			${HDW:%=${HDW_BTARG}/%} \
+			${HDW:%=${HDW_DTARG}/%} \
+			${HDW:%=${HDW_RTARG}/%} \
+			${BHDW:%.boot=${HDW_BTARG}/%} \
+			${DHDW:%.dev=${HDW_DTARG}/%} \
+			${RHDW:%.rom=${HDW_RTARG}/%} \
+			${PGMS:%=${PGMS_BTARG}/%} \
+			${PGMS:%=${PGMS_DTARG}/%} \
+			${PGMS:%=${PGMS_RTARG}/%} \
+			${BPGMS:%.boot=${PGMS_BTARG}/%} \
+			${DPGMS:%.dev=${PGMS_DTARG}/%} \
+			${RPGMS:%.rom=${PGMS_RTARG}/%} \
+			${EXAMPLES:%=${EXAMPLE_XTARG}/%} \
+			${EXAMPLE_DATA:%=${EXAMPLE_XTARG}/%} \
+			${EXAMPLE_SRCS:%=${EXAMPLE_TARG}/%} \
+			${EXAMPLE_LIBS:%=${EXAMPLE_TARG}/%} \
+			${EXAMPLE_DLIBS:%.dlib=${EXAMPLE_TARG}/%.lib} \
+			${TESTS:%=${TEST_TARG}/%} \
+			${UTILS:%=${UTIL_TARG}/%} \
+			${UTIL_INCS:%=${UTIL_TARG}/%} \
+			${DOCS:%=${RELEASEDIR}/doc/%}
+	@true
+
+installtherest: installtherest.down
+	@true
+
+# ========================================================================
+# drops			remove junk files and anything that can be
+#			rebuilt with another make.
+
+DROPS=	${NOROMS:%=%.drop}
+drops.std: ${DROPS}
+	@true
+
+drops.here: drops.std
+drops: drops.down
+
+# ========================================================================
+# print			produce a listing of source files on the
+#			default printer.
+
+print: ${RCSSORT}
+ifneq (0, ${words ${RCSSORT}})
+	@xa2ps ${XFILES} ${HFILES} ${AFILES} ${IFILES} ${CFILES} ${SFILES} | lpr
+endif
+	@true
+
+# ========================================================================
+# unmark		remove the release mark for ${MARK_REL}; also
+#			removes the batch markers for the mark and
+#			populate targets, forcing a re-mark and
+#			re-checkout on the next full build.
+
+unmark.std:
+	-rcs -N${MARK_REL} ${RCSSORT} GNUmakefile >/dev/null 2>&1
+	${RM} .mark.here .pop.here
+unmark.here: unmark.std
+unmark: unmark.down
+
+# ========================================================================
+# unfake		remove fake-target markers, forcing a rebuild
+#			of the tree, and rerunning of the bulk version
+#			marking and RCS checkout targets.
+
+unfake.std:
+	${RM} ${fakes}
+unfake.here: unfake.std
+unfake: unfake.down
+
+# ========================================================================
+# unprep		Remove sufficient fake targets so that a
+#			subsequent "gmake prep" will not skip anything.
+
+unprep.std:
+	${RM} ${fakes}
+unprep.here: unprep.std
+unprep: unprep.down
+
+# ========================================================================
+# clean			remove junk files and anything that can be
+#			rebuilt with another make.
+
+TARGETS= ${sort ${LIBS} ${BLIBS} ${DLIBS} ${RLIBS} ${EXAMPLE_LIBS} ${EXAMPLE_DLIBS} \
+		${HDW} ${BHDW} ${DHDW} ${RHDW} \
+		${PGMS} ${BPGMS} ${DPGMS} ${RPGMS} \
+		${EXAMPLES} ${TESTS} ${UTILS} \
+		${LOCALS} ${BLOCALS} ${DLOCALS} ${RLOCALS}}
+
+CLEANS=		core *.o *.?o *.??o \
+		*.sym *.nosym *.rev *.lst *.log *.map \
+		*.dsp *.dic *.raw \
+		.dep.* ${TARGETS}
+
+clean.std:
+	${RM} ${CLEANS}
+
+clean.here: clean.std
+clean: clean.down
+
+# ========================================================================
+# unlink		remove things that (generally) get linked.
+
+TARGETS= ${sort ${LIBS} ${BLIBS} ${DLIBS} ${RLIBS} ${EXAMPLE_LIBS} ${EXAMPLE_DLIBS} \
+		${HDW} ${BHDW} ${DHDW} ${RHDW} \
+		${PGMS} ${BPGMS} ${DPGMS} ${RPGMS} \
+		${EXAMPLES} ${TESTS} ${UTILS} \
+		${LOCALS} ${BLOCALS} ${DLOCALS} ${RLOCALS}}
+
+unlink.std:
+	${RM} ${TARGETS}
+
+unlink.here: unlink.std
+unlink: unlink.down
+
+# ========================================================================
+# rcsclean		apply rcsclean command to subdirectories
+
+rcsclean.here:
+rcsclean: rcsclean.down
+	@rcsclean
+
+# ========================================================================
+# cleanest		remove sources too
+
+cleanest.std: clean.std
+	-${RM} ${RCSSORT}
+cleanest.here: cleanest.std
+cleanest: cleanest.down
+
+# ========================================================================
+# doclist		list files containing AUTODOC blocks
+
+doclist.std:
+ifneq (0, ${words ${RCSSORT}})
+	-@grep -l AUTODOC ${RCSSORT:%=${HERE}/%}
+endif
+	@true
+doclist.here: doclist.std
+doclist: doclist.down
+
+# ========================================================================
+# srclist		list source files
+
+srclist.here:
+	-@[ -h GNUmakefile.master ] || grep -l . ${HERE}/GNUmakefile.master
+	-@[ -h GNUmakefile ] || grep -l . ${HERE}/GNUmakefile
+ifneq (0, ${words ${DEPFILE}})
+	-@grep -l . ${DEPFILE:%=${HERE}/%}
+endif
+ifneq (0, ${words ${RCSSORT}})
+	-@grep -l . ${RCSSORT:%=${HERE}/%}
+endif
+
+srclist: srclist.down
+
+# ========================================================================
+# rcsdiff		report differences between current files and
+#			the top of the RCS tree.
+
+rcsdiff.here:
+	-@for f in GNUmakefile ${RCSSORT};\
+	do	rcsdiff -r${BUILD_REL} -qwc $$f >/dev/null 2>&1 || \
+		rcsdiff -r${BUILD_REL} -wc $$f || \
+		echo ''; \
+	done
+	@true
+
+rcsdiff: rcsdiff.down
+
+# ========================================================================
+# refresh		explicitly check out all files again; if
+#			BUILD_REV is set, checks out files for that
+#			rev; otherwise, checks files out from the top
+#			of the version tree.
+
+refresh.here:
+	-${CO} GNUmakefile
+	${MAKE} realrefresh
+
+refresh: refresh.down
+	@true
+
+realrefresh.here:
+ifneq (0, ${words ${RCSSORT}})
+	-${CO} ${RCSSORT}
+endif
+	@true
+
+realrefresh: realrefresh.down
+	@true
+
+# ========================================================================
+# update		Check to see if any of the files under RCS
+#			control have changed, and check out just the
+#			ones that have.
+#		XXX- if the BDIRS list changes, this recurses
+#			using the *old* version of the list.
+
+update.here:
+	-if [ ! -h GNUmakefile.master ]; then ${CO} GNUmakefile.master; fi
+	-if [ ! -h GNUmakefile ]; then ${CO} GNUmakefile; fi
+	${MAKE} realupdate
+
+update: update.down
+	@true
+
+realupdate.here:
+ifneq (0, ${words ${RCSSORT}})
+	-${RCSUPDATE} ${RCSSORT}
+endif
+	@true
+
+realupdate: realupdate.here
+	@true
+
+# ========================================================================
+# tags (or ctags)	construct a vi "ctags" file for all include
+#			files and C source files. The "ctags" target
+#			forces an update even if the tags file is
+#			newer than all the sources.
+
+ctags tags: ${HFILES} ${CFILES}
+ifneq (0, ${words ${HFILES} ${CFILES}})
+	ctags -t ${HFILES} ${CFILES}
+endif
+	@true
+
+# ========================================================================
+# TAGS (or etags)	construct an emacs "etags" file for all include
+#			files and C source files. The etags target
+#			forces an update even if the TAGS file is
+#			newer than all the sources.
+
+etags TAGS: ${HFILES} ${CFILES}
+ifneq (0, ${words ${HFILES} ${CFILES}})
+	etags -t ${HFILES} ${CFILES}
+endif
+	@true
+
+# ========================================================================
+# depend		extract listings of dependendencies between .c
+#			and .h files.
+
+ifdef	DEPFILE
+DEPHEAD= DO NOT EDIT THIS FILE: it is recreated by make depend.
+else
+DEPSEP= DO NOT DELETE THIS LINE: it is required by make depend.
+endif
+
+GNUmakefile.nodep: GNUmakefile
+ifdef	DEPFILE
+	${RM} ${DEPFILE} GNUmakefile.nodep
+	${CP} /dev/null ${DEPFILE}
+	${CP} GNUmakefile GNUmakefile.nodep
+	chmod a-w GNUmakefile.nodep
+else
+	${RM} GNUmakefile.nodep
+	-awk '/^# ${DEPSEP}/ { exit; } { print }' < GNUmakefile > GNUmakefile.nodep
+	chmod a-w GNUmakefile.nodep
+endif
+
+depend.here: GNUmakefile.nodep ${DEPSORT}
+ifneq	(0, ${words ${DEPSORT}})
+ifdef	DEPFILE
+	@echo 'adding new autodepend lines to' ${DEPFILE}
+	@${RM} ${DEPFILE}
+	@echo '# ${DEPHEAD}' >> ${DEPFILE}
+	@for f in ${DEPSORT}; do echo ''; sort -u < $$f; done >> ${DEPFILE} 2>/dev/null
+	@chmod a-w ${DEPFILE}
+	@if [ -w GNUmakefile ]; then chmod u+w ${DEPFILE}; fi
+	@${RM} ${DEPSORT}
+ifdef	CHECKINAUTODEPENDS
+	@if   rcs -l ${DEPFILE} >/dev/null 2>&1				; \
+	then if   rcsdiff ${DEPFILE} >/dev/null 2>&1			; \
+	     then rcs -u ${DEPFILE}					; \
+	     else ci -u -m'autodepends from '"${RELEASE}" ${DEPFILE}	; \
+	     fi								; \
+	fi
+endif
+else
+	@echo 'adding new autodepend lines to GNUmakefile'
+	@${RM} GNUmakefile.new
+	@${CP} GNUmakefile.nodep GNUmakefile.new
+	@chmod 644 GNUmakefile.new
+	@echo '# ${DEPSEP}' >> GNUmakefile.new
+	@for f in ${DEPSORT}; do echo ''; sort -u < $$f; done >> GNUmakefile.new 2>/dev/null
+	@chmod a-w GNUmakefile.new
+	@if [ -w GNUmakefile ]; then chmod u+w GNUmakefile.new; fi
+	@${RM} GNUmakefile
+	@${MV} GNUmakefile.new GNUmakefile
+	@${RM} ${DEPSORT}
+ifdef	CHECKINAUTODEPENDS
+	@if   rcs -l GNUmakefile >/dev/null 2>&1			; \
+	then if   rcsdiff GNUmakefile >/dev/null 2>&1			; \
+	     then rcs -u GNUmakefile					; \
+	     else ci -u -m'autodepends from '"${RELEASE}" GNUmakefile	; \
+	     fi								; \
+	fi
+endif
+endif
+endif
+	@${RM} GNUmakefile.nodep
+
+depend: depend.down
+
+ifdef DEPFILE
+include ${DEPFILE}
+endif

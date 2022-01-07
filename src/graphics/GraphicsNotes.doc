@@ -1,0 +1,563 @@
+
+
+Graphics folio update notes
+---------------------------
+
+
+08-Sep-94
+---------
+
+DrawCels() and DrawScreenCels() now have less overhead and therefore run
+faster.
+
+
+01-Sep-94
+---------
+
+CopyVRAMPages(), SetVRAMPages(), CloneVRAMPages(), and WaitVBL() now all
+have better performance. They all now call DoIO() instead of
+SendIO() followed by WaitIO(). This will let the ios complete using
+quick I/O when possible.
+
+
+15-Jun-94
+---------
+
+Fixed a bug in FastMapCelInit which would sometimes cause it to incorrectly
+determine whether or not a cel's dimensions were powers of two.
+
+
+24-May-94
+---------
+
+graphics.lib is now built from individual source files for every function. This
+will avoid any dead code from being linked it with binaries that use functions
+in graphics.lib.
+
+
+10-May-94  Pre-Anvil
+--------------------
+
+Modified CloseGraphicsFolio so that it no longer resets GrafBase.
+
+
+6-May-94  Pre-Anvil
+-------------------
+
+Fixed a bug in DrawChar (called by DrawText8 and DrawText16) that
+attempted to use bad data to when a non-printing character was
+attempted to be drawn.
+
+
+2-May-94  Pre-Anvil
+-------------------
+
+Changed the CloseItem() routine for Screen Items to close any Bitmap
+Items that were opened with the OpenItem() call on a Screen Item.
+
+Added routine CloseGraphicsFolio() that undoes OpenGraphicsFolio().
+
+
+22-Apr-94  Pre-Anvil
+--------------------
+
+Removed calls to printf from graphics.lib
+
+
+15-Apr-94 UK launch release
+---------------------------
+
+The following fields of the GrafBase structure are still visible,
+but will disappear from public view in future releases:
+
+gf_VBLNumber
+gf_ZeroPage
+gf_VRAMPageSize
+gf_DefaultDisplayWidth
+gf_DefaultDisplayHeight
+gf_VBLTime
+gf_VBLFreq
+
+Additional QueryGraphics tags have been added:
+
+QUERYGRAF_TAG_FIELDCOUNT
+uint32 - returns a number that is incremented every video field
+*** Warning *** This number is not the same as gf_VBLNumber.
+gf_VBLNumber is NOT guaranteed to count at a steady rate.
+
+QUERYGRAF_TAG_DEFAULTWIDTH
+int32 - the default width in pixels for displays
+*** Note *** This number will be 320 on every system that can support
+a 320 wide pixel display.  This may not be the preferred width in
+certain environments (PAL for instance).
+
+QUERYGRAF_TAG_DEFAULTHEIGHT
+int32 - the default height in lines for displays
+*** Note *** This number will be 240 on every system that can support
+a 240 line display.  This may not be the preferred height in certain
+environments (PAL for instance).
+
+QUERYGRAF_TAG_DEFAULTDISPLAYTYPE
+int32 - the default display type used on this hardware system.
+
+NOTE:  If an application running in a PAL environment at some times
+displays a full width display, but wants show a narrow display at
+other times (for memory or performance or other reasons) it is
+possible to do this.  However, due to a bug in the hardware design,
+the transition is not as clean as we would have desired.  The display
+may appear incorrect (wrong colors, pixels smeared off the right edge
+of the screen or other visual problems) for up to 8 vblanks.  One
+workaround is to blank the currently visible display by deleting the
+visible Screen and waiting for 8 vblanks before putting up a narrow
+display.
+
+
+14-Apr-94 UK launch release
+---------------------------
+
+The contents of the GrafFolio structure have been removed from the
+public header file graphics.h - this will probably cause a bit of
+code to complain.
+
+Programs should not directly refer to elements of the GrafBase
+structure.  Here is what code should do if it is found to be referring
+to an element of GrafBase:
+
+GrafBase->gf_ZeroPage:  application code should never refer to
+GrafBase_ZeroPage.  Old example code used to show this - hopefully it has
+been cleaned out of all example code.  If code is referring to gf_ZeroPage
+when allocating its display screens, it should stop.  If
+GetBankBits(GrafBase->gf_ZeroPage) is passed in the TagArg list to
+CreateScreenGroup, it can be dropped.  If an application is using
+GrafBase->ZeroPage for clearing display memory, it should use SetVRAMPages
+instead, or it should allocate and clear one page of VRAM and use
+CloneVRAMPages if it is required that the screen clear occur during VBlank.
+
+GrafBase->gf_VBLFreq:  Use the new QueryGraphics() or QueryGraphicsList()
+routine described below.
+
+GrafBase->gf_VBLTime:  Use the new QueryGraphics() or QueryGraphicsList()
+routine described below.
+
+GrafBase->gf_VRAMPageSize:  Use the return value from the kernal call
+GetPageSize(MEMTYPE_VRAM) instead.  This is where the graphics folio got
+the value from in the first place.
+
+New routines have been added to the graphics folio:
+
+Err QueryGraphics ( int32 tag, void* ret );
+Err QueryGraphicsList ( TagArg* ta );
+
+These routines provide a general way for applications to query the graphics
+folio for information about the current environment.
+
+QueryGraphics() looks up a value based on the tag passed in and deposits the
+value at the address pointed to by ret and returns a value of zero if
+successful.  If an unrecognized tag is passed in, a value of GRAFERR_BADTAG
+will be returned and ret will be left unmodified.
+
+QueryGraphicsList() looks up values based on a TagArg list, depositing the
+return values at the locations pointed to by the ta_Arg associated with
+the ta_Tag element used for the lookup.  The processing stops when the
+QUERYGRAF_TAG_END tag is encountered, and a value of zero is returned
+(the ta_Arg for the end tag is left unmodified).  If an unknown tag is
+encountered, processing of the TagArg list stops and a value of
+GRAFERR_BADTAG is returned.
+
+The current tags available for use are:
+
+QUERYGRAF_TAG_END
+no return value - terminates TagArg processing
+
+QUERYGRAF_TAG_FIELDFREQ
+int32 - returns the video display frequency of the current hardware
+(50Hz for PAL, 60Hz for NTSC)
+
+QUERYGRAF_TAG_FIELDTIME
+int32 - returns the length of time for a single video display in usec.
+
+If an application is being designed to run on both NTSC and PAL machines,
+use QueryGraphics to get the video field frequency.
+
+
+
+8-Apr-94 UK launch release
+--------------------------
+
+It is now possible to put up a narrow (320 pixel) display after a wide
+display (384 pixel) has been shown on a PAL system.  It takes 8 video
+fields for the adjustment to occur, so it is not recommended that this
+be done frequently.
+
+
+7-Apr-94 UK launch release
+--------------------------
+
+The graphics folio now calls the MUD interface to obtain data about the
+type of system it is being run on.
+
+Fixed a bug in CreateScreenGroup where asking for a PAL wide display but
+not specifying BitmapWidthArray or BitmapHeightArray caused problems.
+
+Lowered PAL displays by one line (previously they displayed one line too
+high).
+
+SumitVDL() is no longer the correct way to create a VDL list (although
+it is still supported, it now just fronts a call to CreateItem).  Use
+the CreateItem() call to create custom VDL lists instead.  This was
+necessary because SubmitVDL() took a fixed number of arguments and was
+not extensible - for instance there is no way to specify a 288 line
+VDL list for a PAL display with SubmitVDL().  The CreateVDL() macro
+has been defined to issue a call to CreateItem() to create a VDL item
+and to pass in the supplied TagArg list.
+
+The currently supported tags for the CreateItem() call are:
+
+#define CREATEVDL_TAG_VDLTYPE		100
+/* See the list of VDLTYPE_xxx types.  Currently the only supported type
+ * is the full custom type (VDLTYPE_FULL).  The full custom VDL type will
+ * eventually be phased out and replaced with more abstract and system
+ * independent VDL types.
+ * Tag values from 11-99 are ignored for a full custom VDL - it is
+ * assumed that the display control words in the VDL list are already set
+ * in the desired way ModifyVDL() can be called to change the settings of
+ * display control bits in a full custom vdl */
+
+#define CREATEVDL_TAG_DISPLAYTYPE	101
+/* The type of display this VDL is created for.  See the list of DI_TYPE
+ * types.
+ */
+
+#define CREATEVDL_TAG_LENGTH		102
+/* The length of the submitted VDL entry in words */
+
+#define CREATEVDL_TAG_HEIGHT		103
+/* The number of lines of display that this vdl is created for */
+
+#define CREATEVDL_TAG_DATAPTR		104
+/* Pointer to VDL data to use.  This is only for use with a full custom
+ * VDL.
+ */
+
+
+24-Mar-94 PAL Interim release
+-----------------------------
+
+Implemented a combined math folio and graphics folio loader to reduce
+OS footprint by 32k.  The combined loader will go out with the April
+release.
+
+Put in workaround patch to eliminate screen jitter associated with
+HDelay programming during vertical blank.
+
+
+14-Mar-94 PAL Interim release
+-----------------------------
+
+Fixed the system VDLs to eliminate the line of garbage that gets
+displayed on the last line for some titles.
+
+
+1-Mar-94  PAL Interim release
+-----------------------------
+
+Added support for PAL displays.
+
+Currently, the best way for an application to determine if it is
+running an a PAL machine is to inspect the value in
+GrafBase->gf_VBLFreq.  When running on an NTSC system the value should
+be 60, when running on a PAL machine the value should be 50.
+
+Old applications should get a centered 320x240 display when running on
+a PAL system.
+
+Applications running on PAL can request displays up to 288 lines tall.
+
+Applications which request displays less than the full height of the
+screen (240 for NTSC or 288 for PAL) will get their display centered
+vertically.
+
+To get a wide display on PAL, the application must specify the tag
+CSG_TAG_DISPLAYTYPE with a tag value of DI_TYPE_PAL2 in the tagarg
+list that is passed to CreateScreenGroup().  Passing in the tag
+CSG_TAG_DISPLAYTYPE with a tag of DI_TYPE_DEFAULT or not specifying
+the tag at all will get the default display type, which for NTSC
+is DI_TYPE_NTSC (320x240 display), and for PAL is DI_TYPE_PAL1
+(320x288 display).
+
+If no screen height is specified in the CreateScreenGroup() call,
+a screen height of 240 is assumed.
+
+Warning - after a 384 wide display has been shown, 320 wide displays
+no longer work properly until the machine has been reset.
+
+There is currently no way to specify a display height when passing
+a VDL list to SubmitVDL().  Any custom VDL passed to SubmitVDL will
+therefore be limited to 240 lines.  A new more generalized routine
+is being developed that will overcome the limitations in the current
+SubmitVDL() routine, and the current SubmitVDL() routine will just
+become a front end facade that calls the more general routine.  If
+the application needs custom VDLss to be full screen height on PAL,
+currently the VDLs must be created through the CreateScreenGroup()
+call instead of the SubmitVDL() call.
+
+
+5-Jan-94  FZ1J release notes
+----------------------------
+
+Added routine ModifyVDL
+
+Added Greg Omi's fast mapcel code to graphics.lib.
+
+Greg's fast mapcel code is incompatible with what went before.
+
+Before using it on a cel, FastMapCelInit() must first be called.  This
+routine replaces the width and height fields in a CCB with either the
+reciprocals of those values, or the log base 2 of those values if both
+values are powers of two.  After FastMapCelInit has been called for a
+cel, instead of MapCel call either FastMapCel() or FastMapCelf16().
+FastMapCel() functions like MapCel() but will not necessarily produce
+identical results to MapCel().  FastMapCelf16() is used when the
+corners specified in the quad passed in are in 16.16 (frac16) format
+instead of integer coordinates.
+
+
+1-Sep-93  post-Dragontail release
+---------------------------------
+
+Added new routine DeleteScreenGroup.  DeleteScreenGroup undoes what
+CreateScreenGroup does.  Previously, DeleteScreenGroup was #define'd
+to DeleteItem, which does not currently do the proper thing for a
+ScreenGroup Item.
+
+DeleteScreenGroup will not delete VDLs that were created with the
+initial CreateScreenGroup call if new VDLs have been attached to the
+screens with the SetVDL call.  If a VDL has been attached to the
+screen with a SetVDL call, it will be deleted if DeleteScreenGroup
+is called for the screen group that includes that screen.
+
+All application programs compiled under dragontail 5 or later should
+be binary compatible with this version of the graphics folio.
+
+
+30-Aug-93  post-Dragontail release
+----------------------------------
+
+Split out CreateBitmap from CreateScreenGroup.  It is still possible
+to call CreateScreenGroup as before (which now calls CreateItem to
+create the bitmap in the proper fashion).
+
+It is now possible to call CreateItem to create a bitmap that is not
+associated with any screen group.  A bitmap created this way must
+have its buffer area pre-allocated, and the minimum tag list that
+can be passed in to the CreateItem call must include the pointer
+to the buffer area, the width, and the height of the bitmap.
+
+The header file graphics.h has a #define for CreateBitmap which
+will create a CreateItem() call with the first argument set to the
+type and subtype of the graphics folio bitmap Item.  CreateBitmap
+can be used in application code instead of CreateItem for improved
+readability.
+
+The currently supported tags for bitmap creation follow:
+
+#define CBM_TAG_DONE		0	/* end the tag list */
+#define CBM_TAG_WIDTH		11	/* total width of bitmap */
+#define CBM_TAG_HEIGHT		12	/* total height of bitmap */
+#define CBM_TAG_BUFFER		13	/* address of bitmap buffer */
+#define CBM_TAG_CLIPWIDTH	14	/* optional width of bitmap clip region */
+#define CBM_TAG_CLIPHEIGHT	15	/* optional height of bitmap clip region */
+#define CBM_TAG_CLIPX		16	/* optional X origin of bitmap clip region */
+#define CBM_TAG_CLIPY		17	/* optional Y origin of bitmap clip region */
+#define CBM_TAG_WATCHDOGCTR	18	/* optional value for cel engine timeout */
+#define CBM_TAG_CECONTROL	19	/* optional value for CEControl register */
+
+In addition, the additional general Item creation tags are supported.
+
+
+16-Aug-93  Dragontail release
+-----------------------------
+
+Fixed a minor flaw in the DrawCels logic which should eliminate all
+occurances of the latest detected hardware problem.
+
+
+8-Aug-93  Dragontail release
+----------------------------
+
+Tasks are now able to OpenItem other tasks' Bitmap and Screen Items, as
+long as the task attempting the OpenItem has write permission to the
+memory referenced by the Bitmap.  Threads of a task all have the same
+memory permission settings, so a task and its threads should now be
+able to issue OpenItem calls on each others Screens and Bitmaps.  To
+allow another task access, a ControlMem call will have to be issued by
+the owner of the Bitmap to grant write permission to the other task.
+
+Added more diagnostic messages when built in developer mode.
+
+Some structures have changed size. All code that accesses the graphics
+folio MUST be recompiled and relinked.
+
+WARNING:  Although it will be tempting to replace old WaitVBL() calls
+with a routine that does a GetVBLIOReq(), WaitVBL(), DeleteItem(), this
+will eventually exhaust system resources causing the system to crash!
+The correct sequence is to call GetVBLIOReq() once in each thread, and
+use the returned IO request Item for each WaitVBL() call within that
+thread.
+
+A similar warning applies to the SPORT transfer convenience routines
+SetVRAMPages, CopyVRAMPages and CloneVRAMPages.  It makes sense for
+an application to allocate more than one IO request for SPORT transfer
+access so that several transfers can be queued up together for use with
+the deferred versions of the routines, but it does not make sense to
+constantly create and dispose of the IO request Items.
+
+
+4-Aug-93  Dragontail release
+----------------------------
+
+Added some extra paranoia to the graphics folio.
+
+The SetCEWatchDog() routine now expects its time argument in usec,
+instead of video fields.
+
+Removed some unused fields from the GrafFolio structure.
+
+Added two new fields to the GrafFolio structure:
+
+gf_VBLTime  length of time for one display field in usec
+gf_VBLFreq  approximate frequency of display fields in Hz
+
+
+29-Jul-93  Dragontail release
+-----------------------------
+
+Removed all external support for file based fonts.
+
+
+27-Jul-93  Dragontail release
+-----------------------------
+
+Moved SetCEWatchDog routine from user mode to supervisor mode (it would
+always fail in user mode).
+
+Added paranoia to graphics folio.  The graphics folio will no longer
+render to a bitmap Item that is not owned by the current task.  Tasks
+that wish to share renderable buffers must all have write access to
+the buffer memory, and must create separate bitmap items to point to
+that memory.
+
+The convenience routines that access the VBL timer and the SPORT
+transfer operations now zero out their IOInfo structures before
+issuing the IO requests to the system.
+
+Fixed a bug in the SubmitVDL proofing of incoming VDL lists.
+
+
+24-Jul-93  Dragontail release
+-----------------------------
+
+Modified the following functions:
+
+Err WaitVBL (Item ioreq, uint32 numfields);
+Err SetVRAMPages
+	(Item ioreq, void *dest, int32 val, int32 numpages, int32 mask);
+Err CopyVRAMPages
+	(Item ioreq, void *dest, void *src, ulong numpages, ulong mask);
+Err CloneVRAMPages
+	(Item ioreq, void *dest, void *src, ulong numpages, ulong mask);
+
+The WaitVBL function now requires two parameters:  An IO request Item set up to
+use the timer device, and a count of the number of VBlanks to wait.  The IO
+request Item can be obtained by calling the new GetVBLIOReq convenience
+function.  The WaitVBL function now returns an error condition if there are any
+problems.
+
+The functions that provide a convenience interface to the SPORT device now
+require an extra parameter - an IO request Item set up to use the SPORT device.
+The IO request Item can be obtained by calling the GetVRAMIOReq convenience
+function.  The SPORT transfer functions now return an error condition if there
+are any problems.
+
+Added new functions:
+
+Item GetVBLIOReq (void);
+Item GetVRAMIOReq (void);
+Err WaitVBLDefer (Item ioreq, uint32 numfields);
+Err SetVRAMPagesDefer
+	(Item ioreq, void *dest, int32 val, int32 numpages, int32 mask);
+Err CopyVRAMPagesDefer
+	(Item ioreq, void *dest, void *src, ulong numpages, ulong mask);
+Err CloneVRAMPagesDefer
+	(Item ioreq, void *dest, void *src, ulong numpages, ulong mask);
+
+GetVBLIOReq returns an IO request item suitable for use with the WaitVBL or
+WaitVBLDefer functions.  GetVRAMIOReq returns an IO request Item suitable for
+use with the SPORT transfer convenience functions.
+
+<function>Defer is like <function> except that it just issues a SendIO and
+returns immediately.  Code can later check the status of the IO request by
+issuing a CheckIO or WaitIO call on the IO request Item used.  It is now
+possible to queue up several SPORT transfers in advance, but remember that
+each one must have its own IO request Item.
+
+Calling OpenGraphicsFolio from both a task and its threads behaves much
+better, and in fact is the recommended thing to do if the main task and its
+threads each need access to the graphics folio routines.  It is now possible
+for a task and its threads to have access to the convenience routines for
+the VBL timer and SPORT transfer devices by allocating separate IO request
+items.
+
+The CopyLine and ResetSystemGraphics routines have been removed.
+
+This release of the graphics folio is not compatible with earlier releases
+and any code that uses it MUST be recompiled and relinked.
+
+The DeleteVDL and DeleteScreenGroup routines have been replaced with macros.
+
+The WaitVBLCount and WaitVBLNumber macros have been removed.
+
+The following routines performed no function and have been removed:
+
+ResetSystemGraphics
+CopyLine
+FillEllipse
+GrafInit
+
+
+20-Jul-93  ROM Final update
+---------------------------
+
+Put in code to work around hardware problem with cel engine reset
+
+
+13-Jul-93  ROM Beta update
+--------------------------
+
+Added Copyright notices
+
+
+8-Jul-93  ROM Beta update
+-------------------------
+
+Fixed bug with last line of display showing garbage
+
+Laid groundwork for proper VIRS initialization
+
+
+1-Jul-93  ROM release interim update
+------------------------------------
+
+The link library source code has been split into several seperate source files
+so that calling any single function in the link library does not cause the
+entire library to be included in the object code.
+
+Link library stub routines that called graphics folio SWI functions have been
+removed and replaced with the inline SWI constructs.
+
+The graphics folio prints version and revision numbers when it starts up.
+
+Memory allocation during font initialization was attempting to allocate
+from the graphics folio's user memory heap, when it should have been
+allocating from the OS' supervisor memory heap.
+

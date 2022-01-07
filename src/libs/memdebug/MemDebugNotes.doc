@@ -1,0 +1,121 @@
+
+                          memdebug.lib Release Notes
+                          ==========================
+
+16-Dec-94
+---------
+
+  - Added support for CreateThread()/DeleteThread(). The code will no
+    longer flag the stack allocated by CreateThread() as being unfreed
+    memory.
+
+
+09-Dec-94
+---------
+
+  - Added support for allocations of MEMTYPE_TRACKSIZE. It really didn't
+    like being passed a negative size when such a memory block is freed.
+
+
+08-Sep-94
+---------
+
+  - If a memory allocation fails because the code wasn't able to lock the
+    internal semaphore, a message is now displayed informing the developer
+    that an attempt was made to allocate memory before CreateMemDebug() was
+    called. That'll be quite helpful for them to figure out why their code
+    won't work anymore. This type of problem can happen if they are linking
+    with memdebug.lib, because they were previously doing debugging, but are
+    no longer calling CreateMemDebug().
+
+
+23-Aug-94
+---------
+
+  - Major source cleanup and size reductions throughout.
+
+  - Added MEMDEBUG support for AllocMemBlocks()
+
+  - Added support for the MEMDEBUGF_USE_VRAM flag
+
+  - Improved formatting of output.
+
+  - Now complains when a non 32-bit aligned List parameter is passed to
+    AllocMemFromMemLists() or FreeMemToMemLists().
+
+  - SanityCheckMemDebug() now dumps trashed cookies to the screen like
+    ReleaseMemory() does.
+
+  - No longer complains when FreeMem() is called with a NULL pointer since
+    that's not an error condition.
+
+  - Fixed bug in SanityCheckMemDebug() where it was not outputting the number
+    of outstanding allocations when allocations were left behind by a dead
+    thread.
+
+  - Fixed bug where ReleaseMemory() was not outputting the correct memory chunk
+    when the post cookie was trashed in an allocation.
+
+  - Fixed bug where there was a missing MemError() call when trying to allocate
+    a memory block of size 0.
+
+  - Fixed bug where the task specific data would get freed even if some vram
+    allocations still existed.
+
+
+05-Aug-94
+---------
+
+  - Made memdebug usable by supervisor-mode code.
+
+
+14-Jun-94
+---------
+
+  - When a cookie is found to have been corrupted, the original value of
+    the cookie, and the modified value of the cookie are displayed to
+    the console.
+
+  - DumpMemDebug() now outputs detailled statistics about the memory
+    allocation pattern of the task/threads. It outputs the current amount
+    of allocated memory, the maximum amount of memory allocated at one
+    time in the life of the app, the total number of allocation calls
+    performed, and more.
+
+  - Added the MEMDEBUGF_KEEP_TASK_DATA control flag. When this flag is
+    specified, it tells the debugging code to keep the statistics on a
+    task, even when all the memory allocated by that task has been returned
+    to the system. Normally, the data structure containing these stats
+    is returned to the system as soon as all memory is freed. Keeping the
+    structure allocated allows DumpMemDebug() to output statictics
+    about dead task/threads.
+
+  - DeleteMemDebug() now explicitly frees any memory that remains allocated
+    when it is called.
+
+
+10-Jun-94
+---------
+
+  - Implemented SanityCheckMemDebug(). This function sifts through all of
+    the allocated memory blocks and makes sure all of the pad cookies are
+    intact. It also checks that all memory currently allocated belongs to
+    live tasks or threads.
+
+  - Implemented InstallMemDebugErrors(). This installs error strings
+    describing the error codes of this module. This is meant to be used
+    by the shell.
+
+  - Now returns an error code if DumpMemDebug() is called without having called
+    CreateMemDebug() previously, or after having called DeleteMemDebug().
+
+  - Improved and streamlined general output formatting.
+
+  - Now specifies which memory call (AllocMem, malloc(), free(), etc) was
+    used to allocate and free memory blocks when it reports errors.
+
+  - Now considers allocating a block of size 0 as an error, and complains
+    about it.
+
+  - Now checks that the pointer passed to AllocMemFromMemLists() and
+    FreeMemToMemLists() is not NULL

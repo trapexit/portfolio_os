@@ -1,0 +1,460 @@
+$Id: filesystem.doc,v 1.1 1992/09/11 00:58:16 dplatt Exp $
+
+$Log: filesystem.doc,v $
+# Revision 1.1  1992/09/11  00:58:16  dplatt
+# Initial revision
+#
+
+OPERA FILESYSTEM SPECIFICATION, DRAFT 8/18/92
+---------------------------------------------
+
+"Before we get started, there's one thing I want you to know.  Not
+ everything I'm about to tell you, is the truth.  I figured you should
+ know that right up front.  So, if some day you should go to Morocco and
+ you find it's not anything like what I said it was... that's _your_ big
+ fat problem.  OK?  OK."
+
+	Casbah Kelly
+
+Opera Filesystem Interface
+--------------------------
+
+The Opera filesystem is, in essence, a high-level device driver which
+interposes itself between the application and the "raw" disk device.
+The application may issue a call to open a specific disk file, and will
+receive in return an Item for a Device node.  This Device item (referred
+to internally as an "open-file") can be treated like most other Device
+items... one can create one or more IOReq items for the Device item, and
+send these IOReqs to the device to read data from the file.
+
+The filesystem is implemented as a combination of a folio (always
+installed as Item 2), a driver (which manages the filesystem and
+open-file devices), a library (which provides application-level
+functions not bundled into the driver or folio) and a daemon task (which
+manages I/O scheduling).  The filesystem must be installed at system
+startup time (typically by executing the "fs" AIF image from an Opera
+shell task) before its services may be called upon.
+
+The first version of the Opera filesystem is designed and implemented as
+a READ-ONLY system.  It is not currently possible to create, write, or
+modify files on either a native or network-based Opera filesystem via
+the Opera filesystem functions.  Opera-native filesystems are created
+via an offline "mastering" process, available on Sun workstations and on
+Macintosh systems equipped with MPW.
+
+Design philosophy
+-----------------
+
+The Opera filesystem structures have been designed with a number of
+facts in mind:
+
+-  Most Opera filesystems will reside on CD-ROM devices.
+
+-  CD-ROM drives are slow... seek times are measured in hundreds of
+   milliseconds.  Minimizing the amount of head-seeking required during
+   game play will be critical to the responsiveness of the system.
+
+-  Opera CD-ROM discs may tend to be handled and stored under
+   less-than-ideal conditions.  They may be subject to accidental damage
+   during or between uses.  Some portions of an Opera disc may be
+   damaged enough to prevent them from being read reliably (or at all!)
+   due to scratches, dings, peanut butter, baby drool, etc.
+
+For these reasons, the Opera filesystem has been designed to support
+data replication, in a way which is transparent to the application and
+to the user (except for a possible delay, if one copy of the data cannot
+be read and the CD-ROM mechanism must seek another copy).  The File
+Driver prioritizes, sorts, and optimizes I/O requests to the filesystem
+device, in order to minimize the total seek-and-read time for individual
+requests and for groups of requests.
+
+Files
+-----
+
+Files are collections of blocks, each block containing a fixed number of
+bytes.  The block size of a file is often constrained by the block or
+sector size of the device on which it resides... for example, on a
+CD-ROM filesystem, most files will have a block size of 2048 bytes.
+
+The filesystem supports the concept of a "logical" file size, which may
+be less than the file's physical size if the last block of the file is
+not entirely filled with data.
+
+Open-file devices respond to a standard Read command.  The ioi_Offset
+field in the IOInfo structure specifies a block offset into the file...
+_not_ a byte offset!  The file driver can read data from files ONLY in
+complete-block chunks!  After opening a file, the application should
+query the file with a Status call to determine its block size, allocate
+sufficient memory to hold one or more blocks' worth of data, and Read
+the data into this memory one or more blocks at a time.
+
+A library package called "FileStream" is provided to support a
+"bytestream-oriented" technique for reading data from block-oriented
+files.  This package is described in detail later in this document.
+
+Open-file devices respond to a standard Status command.  The caller may
+use a standard DeviceStatus structure to get basic information about the
+file, or may use the somewhat longer FileStatus structure to get both
+basic and extended information.
+
+Open-file devices do NOT, at this time, respond favorably to a Write
+command, and may invoke Bushushita.
+
+
+Directories
+-----------
+
+In Opera-native filesystems, directories are implemented as ordinary
+disk files which are "flagged" as being of a specific type.  They can be
+opened and read as normal files by applications which wish to interpret
+the directory contents manually (although this is not recommended... use
+the directory-traversal library instead!)
+
+Opera directories consist of one or more disk blocks.  Each block starts
+out with a 20-byte header which gives the block numbers of the previous
+and subsequent blocks in the directory (with -1 meaning indicating that
+there is no predecessor or successor), a flag longword, and longwords
+giving the byte offset into the block of the first valid entry and the
+first free byte (in both cases, zero means "none").  The header is
+followed by zero or more variable-length file descriptor entries, packed
+together with no space between them.  The last descriptor in each block
+has a bit set in its flag words to indicate that it's the last one; the
+last descriptor in the last non-empty block may have an additional flag
+set to indicate that it's the last one in the directory (this flag is
+present for filesystems created by the layout tool, but might not be
+guaranteed for filesystem directories updated by a future read/write
+version of the Opera filesystem).
+
+The Opera CD-ROM layout tool creates directories whose blocks are in
+strict ascending sequence, and which are packed as full of directory
+information as possible.  A future version of the filesystem may support
+read/write access to files, and will thus be able to expand directories
+as necessary (adding and deleting entries, adding blocks as necessary,
+re-ordering blocks).
+
+In non-native (debugger- or network-based) Opera filesystems,
+directories are implemented as black-box files of unspecified internal
+format.  They can be opened as if they were normal files, but they may
+or may not respond meaningfully to a Read command.  A specialized
+GetNthEntry command can be issued to such a directory-file to access
+information (name, type, etc.) about entries in the directory.
+
+A library package is provided to open and iterate through an Opera
+filesystem directory, regardless of whether it resides on a native or
+foreign filesystem.  Application programs should use this package rather
+than attempting to interpret directory blocks themselves.
+
+Avatars
+-------
+
+Each file consists of one or more "avatars", placed in arbitrary
+locations across the disc.  Each avatar is an exact, co-equal image of
+the data in the file.  
+
+The file driver keeps track of the current position of the device's read
+head.  When asked to read data, it automatically choses the "closest
+avatar in good condition" of each block of data it is asked to read.  If
+more than one read is to be performed, the driver sorts the read
+requests in order to minimize the amount of head-seeking which must be
+performed.  It honors the I/O request priorities during this process...
+all requests of one priority, will be completed before any requests of a
+lower priority are scheduled.
+
+If the device has trouble reading a data block contained within one
+avatar of a file, the file driver marks that avatar as "flawed" and
+re-issues the read request...  thus searching out another avatar on the
+disc, if one exists.
+
+It is not necessary... nor is it desireable... for all files in an Opera
+filesystem to have the same number of avatars.  Critical directories, or
+files which are accessed frequently throughout the execution of the
+game, may have as many as a dozen avatars scattered across the disk.
+Large files, or those containing non-critical data, may have only one
+avatar.
+
+Interleaving
+------------
+
+The Opera filesystem code supports the concept of interleaved files...
+files which are laid out as "bursts" of blocks on the disk, with each
+burst being separated from the next burst by a "gap" of blocks which
+belong to another file (or which are entirely unallocated).  For any
+individual file, the burst and gap sizes are fixed and are the same for
+all avatars.  A gap size of zero is used to indicate a file which is not
+interleaved.
+
+Specifying files
+----------------
+
+The Opera filesystem uses pathnames which are akin to those used in
+Unix.  An absolute pathname is of the form:
+
+	/filesystem/dir1/dir2/dir3/(more)/dirN/filename
+
+and a relative pathname is of one of the forms
+
+	filename
+	dir/filename
+	dir1/dir2/(more)/dirN/filename
+
+A directory-name of "." means "stay here".  A directory-name of ".."
+means "go back up one level".  A directory name of "^" means "go back up
+to the root directory in whatever filesystem we're currently looking
+in".
+
+Relative pathnames can be used in either of two ways.  In the
+"OpenDiskFile" call, they specify a path relative to the current's
+task's "current directory" location if one has been specified.  In the
+"OpenDiskFileInDir" call, they specify a path relative to a directory
+whose Item is also specified in the call.
+
+Byte-stream file access
+-----------------------
+
+A set of library functions are provided to ease the job of accessing a
+file's contents in a byte-by-byte fashion, rather than in the block-
+by-block mode supported by the File Driver interface.  This library
+package allows a program to read an arbitrary number of bytes from a
+file, without worrying about block boundaries.
+
+The "FileStream" library handles all of the messy stuff.  It opens the
+disk file (identified by pathname), allocates buffer space (two blocks'
+worth by default, or however much is specified by the programmer), reads
+data into the buffer, and copies the data into a user-supplied area upon
+requrest.  FileStream is designed to be pro-active in keeping the buffer
+as full as possible - it reads data into the buffer asynchronously, and
+will read data whenever there's at least one block's worth of free space
+in the buffer.  The FileStream library permit seeking around within the
+stream.
+
+
+Interface
+---------
+
+In order to compile code which uses the filesystem, you must #include the
+following files:
+
+	#include "filesystem.h"
+	#include "filefunctions.h"
+
+The "filesystem.h" file contains the #define, struct, and typedef
+directives which specify the filesystem data structures.  The
+"filefunctions.h" file contains subroutine declarations for the SWI
+functions available in the file folio.
+
+You'll also need to link with the "filesystem.lib" file, which contains
+the SWI glue and other stuff.
+
+In order to use the filesytem-independent directory traversal routines,
+you must
+
+	#include "directory.h"
+	#include "directoryfunctions.h"
+
+and link with the DirectoryAccess library.
+
+In order to use the byte-oriented access library, you must
+
+	#include "filestream.h"
+	#include "filestreamfunctions.h"
+
+and link with the FileStream library.
+
+All of the above will be placed in the Opera development directory
+hierarchy at appropriate times.
+
+The FileStream and DirectoryAccess routines may be moved into the File
+Folio at some point in the future.  If they are, then it will not be
+necessary to link with the libraries.
+
+File Folio routines
+-------------------
+
+Item OpenDiskFile(char *path);
+
+Opens a disk file, given an absolute or relative pathname, and returns
+its Item number.  If an error occurs, a negative Item-number / error
+code will be returned.
+
+#
+
+Item OpenDiskFileInDir(Item dirItem, char *path);
+
+Similar to OpenDiskFile, this function allows the caller to specify the
+Item of a directory which should serve as a starting location for the
+file search.  If an error occurs, a negative Item-number / error code
+will be returned.
+
+#
+
+int CloseDiskFile(Item fileItem);
+
+Closes an open-file, and destroys its node.  The specified Item may not
+be used after successful completion of this call.  Returns 0 if the
+closure was successful, or an error code if not.
+
+#
+
+Item LoadProgram(char *path);
+
+Given a path which specifies a disk file in executable relocatable AIF
+format, this call opens the file, reads it into memory, launches it as a
+task, and returns the Item of the newly-created task.  Returns a
+negative Item if the launch was unsuccessful for any reason.
+
+#
+
+Item MountFileSystem(Item deviceItem);
+
+Privileged function.  Given the Item for a "raw" disk device, this
+function searches the device for an Opera filesystem label, validates
+the label, creates a new FileSystem and its associated data structures,
+and returns the Item for the new FileSystem.  If an error occurs, a
+negative Item-number / error code will be returned.
+
+#
+
+Item ChangeDirectory(char *path);
+
+Changes the current task's "working directory" to the absolute or
+relative location specified by the path, and returns the Item number for
+the directory.  If an error occurs, a negative Item-number / error code
+will be returned.
+
+#
+
+Item GetDirectory(char *pathBuf, int pathBufLen);
+
+Returns the Item number of the current's task's "working directory".  If
+pathBuf is non-null, it must point to a buffer of writeable memory whose
+length is given in pathBufLen;  the absolute pathname of the current
+working directory is stored into this buffer.
+
+Directory Access routines
+-------------------------
+
+Directory *OpenDirectoryPath(char *thePath);
+
+Given an absolute or relative path to a directory, this routine allocates
+a new Directory structure, opens the directory, and prepares for a
+traversal of the contents of the directory.
+
+#
+
+Directory *OpenDirectoryItem(Item openFileItem);
+
+As above, but this routine accepts the Item number of an open file
+rather than a pathname.
+
+#
+
+long int ReadDirectory (Directory *dir, DirectoryEntry *de);
+
+This routine fetches the next entry from the specified Directory (either
+by interpreting the Opera directory structure, or issue a GetNthEntry
+command to a non-Opera directory-file).  It stores the information from
+the directory entry into a DirectoryEntry structure whose address is
+passed by the calling routine.
+
+This routine returns 0 to indicate success, and a negative error code to
+indicate an error (such as end-of-directory).
+
+#
+
+void CloseDirectory (Directory *dir);
+
+This routine completely deallocates a Directory structure, releasing any
+memory it is using, and closing the OpenFile associated with the
+Directory.
+
+FileStream functions
+--------------------
+
+Stream *OpenDiskStream(char *theName, long int bSize);
+
+This routine allocates a new Stream structure, opens the disk file
+identified by an absolute or relative pathname, allocates the specified
+amount of buffer space, and initiates an asynchronous read to fill the
+buffer with the first portion of the file's data.  It returns NULL if
+any of these functions cannot be performed for any reason.
+
+The bSize field specifies the amount of buffer space to be allocated to
+the file stream.  It may be positive (giving the number of bytes to
+be allocated), zero (indicating that a default allocation of two blocks
+should be used), or negative (giving the two's complement of the number
+of blocks' worth of memory which should be allocated).
+
+#
+
+int ReadDiskStream(Stream *theStream, char *buffer, long int nBytes);
+
+This routine transfers the specified number of bytes (or, as many as are
+left before the end-of-file) from the stream (beginning at the stream's
+current position) to the specified buffer.  It advances the stream's
+position past the bytes which have been transferred, and returns the
+actual number of bytes transferred.  It will initiate an asynchronous
+read to read additional data into the stream's internal buffer, if
+possible and appropriate.
+
+#
+
+void CloseDiskStream(Stream *theStream);
+
+This routine closes the stream's file, deallocates the buffer memory,
+and releases the stream structure itself.
+
+long int SeekDiskStream(Stream *theStream,
+                        long int offset,
+                        enum SeekOrigin whence);
+
+theStream is a pointer to an open Stream.
+offset is a byte offset into the file, and
+whence is SEEK_SET, SEEK_CUR, or SEEK_END.
+
+The offset is specified in any of three ways:  absolute (positive) byte
+offset from the beginning of file (SEEK_SET), relative byte offset from the
+current position in the file (SEEK_CUR), or absolute (negative) byte offset
+from the end of the file (SEEK_END).
+
+The function returns -1 if the offset is outside of the legal range or if
+the whence field contains an illegal value (I'll turn these into real Opus
+error codes prior to general release).  Otherwise, it returns the
+actual (absolute) offset to which the seek will occur (i.e. it resolves any
+SEEK_CUR or SEEK_END values into SEEK_SET format).
+
+This function doesn't actually perform the seek, or do any I/O, or invalidate
+the data in the stream, or abort a readahead-in-progress.  It simply stores
+the desired offset and a "please seek" request into the stream structure.
+The actual seeking, if any, will occur on the next call to ReadStream.
+
+Seeks are very efficient if they are [1] backward seeks which don't take you
+outside of the current block, or [2] forward seeks which don't take you
+outside of the amount of data which has actually be read ahead into the
+buffer.  Short seeks of this nature simply adjust the pointers, and then allow
+the read to continue from the appropriate place in the buffer.
+
+Seeks which move you backwards outside of the current block, or forwards
+past the amount of data in the buffer, will force all of the data in the
+buffer to be flushed.  Data from the sought-after portion of the file will
+be read into the buffer (synchronously) and the read will be completed.
+As a result, you'll see some latency when you issue the ReadDiskStream
+call.
+
+If you wish to do a "seek-ahead"... that is, you wish to seek to a specified
+location in the file but not necessarily read anything immediately... then
+the best thing to do is a SeekDiskStream followed immediately by a zero-byte
+ReadDiskStream... this is a special-case which will start the readahead for
+the data you're seeking, and then return without waiting for the I/O to
+complete.  When you issue a nonzero-length ReadDiskStream some time
+later, the data will probably have been read in, and there will be no delay
+in accessing it.
+
+TBD
+---
+
+Need to add read-single-line mode to FileStream code.
+
+Need to enhance FileStatus structure with additional information.
+
+Need to investigate extensions needed to support read/write filesystems.
+

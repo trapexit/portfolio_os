@@ -1,0 +1,12 @@
+
+
+15 Sep 1994 (peabody)
+---------------------
+
+  - Added glue macros to varargs_glue.h to facilitate creating folio call
+    glue functions (both fixed and variable argument types).
+
+13 Sep 1994 (peabody)
+---------------------
+
+  - Added varargs_glue.h to facilitate creating VA tag glue functions.

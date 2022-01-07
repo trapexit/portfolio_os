@@ -1,0 +1,15 @@
+
+                        Compression Folio Release Notes
+                        ===============================
+
+15-Sep-94
+---------
+
+  - There are now 4 varargs equivalent to existing functions in the folio,
+    which makes calling these functions much easier.
+
+
+17-Aug-94
+---------
+
+  - Initial release. Greatest thing since sliced bread.

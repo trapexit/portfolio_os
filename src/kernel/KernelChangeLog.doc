@@ -1,0 +1,400 @@
+
+14-Nov-94 (vertex)
+------------------
+
+  - Implemented GetSystemState() and SetSystemState(). This interface is
+    currently used to set/get the disc type register in a Toshiba system.
+    In the future, additional services may be provided through the addition of
+    more tags.
+
+
+31-Oct-94 (vertex)
+------------------
+
+  - Implemented MEMTYPE_TRACKSIZE. If you specify this flag when allocating
+    memory, it indicates that you want the system to track the size of the
+    allocation. When you free the memory, you must then specify -1 as a
+    size parameter to FreeMem(). This tells FreeMem() to figure out the
+    size itself. This new feature handles page-aligned allocations correctly
+    (which is the tricky part).
+
+  - Implemented GetMemTrackSize() which returns the size of a block of memory
+    allocated using MEMTYPE_TRACKSIZE.
+
+
+26-Oct-94 (vertex)
+------------------
+
+  - Fixed a bug where deleting a task or thread that is currently waiting
+    for a semaphore would corrupt the semaphore.
+
+
+12-Oct-94 (vertex)
+------------------
+
+  - All the kernel's .i files were updated to match the .h files as much as
+    possible
+
+
+06-Oct-94 (limes)
+-----------------
+
+  - allocmem.c (FreeMemToMemList): When FreeMemToMemList() is handed a
+    block of memory that ends in the middle of an allocation chunk,
+    the final chunk must be *INCLUDED* in the free block, rather than
+    EXCLUDING it, to match the logic in AllocMemFromMemList(); callers
+    will give the same size to the Free routine that they gave to the
+    Alloc routine.
+
+    Truncating the block size results in the final chunk never getting
+    freed, resulting in horrible fragmentation and memory leakage, and
+    causing Total Eclipse (at least) to completely fail to boot.
+
+
+30-Sep-94 (vertex)
+------------------
+
+  - WaitIO() is now a SWI. This routine will now refuse to wait if the
+    caller is not the owner of the IO request. It will also return an
+    error if the IO request is deleted while it is being waited for.
+
+  - WaitPort() is now a SWI. This routine will now refuse to wait if the
+    caller is not the owner of the port. It will also return an error if
+    the message being waited for gets deleted.
+
+  - Definitions for SuperInternalWaitPort() and SuperInternalWaitIO() were
+    added. This may help squeeze some extra performance out of supervisor
+    code.
+
+
+29-Sep-94 (vertex)
+------------------
+
+  - Fixed security hole with error text nodes. All pointers and tables are
+    now fully validated before use. The error list is now protected with a
+    semaphore.
+
+  - When closing a folio for the last time, any items opened by the
+    current task on that folio are now closed automatically.
+
+  - When closing a device for the last time, any IOReqs created by the
+    current task on that device are now deleted automatically.
+
+  - Devices now refuse to delete themselves if their open count is > 0.
+
+  - The ER_Kr_FolioStillOpened error in operror.h was renamed to
+    ER_Kr_ItemStillOpened to be more generic.
+
+  - Many definitions in folio.h were marked as private so they get stripped
+    out when building a developer release.
+
+
+27-Sep-94 (vertex)
+------------------
+
+  - Fixed security hole. It is no longer possible to create a timer
+    item unless you are a privileged task, or if the system says there
+    is no current task (which happens at bootup when the kernel creates
+    the timer items)
+
+  - Fixed a bug in AbortIOReqs() where the kernel could get very upset
+    if someone created a new IO request while the function was executing.
+    This could result in a crash, or in a breach of security.
+
+  - Fixed bug in CreateFolio() which allowed privileged-only tags through
+    without complaining for non-privileged callers. This might have been
+    a possible way to breach security.
+
+  - Fixed bug where dev_DeleteDevice() was being called before the
+    IOReqs for the device were deleted.
+
+  - Implemented code that will delete any IOReqs that a task has
+    on a device when the task closes the device for the last time.
+    This will prevent the task from doing IO with a device it has not
+    open (which is illegal). A message is printed to the console whenever
+    an IOReq is found and the device is not currently open by the task
+    or thread.
+
+
+23-Sep-94 (vertex)
+------------------
+
+  - Removed some dead code throughout
+
+  - Speeded up the TimeStamp() routine which is used by the timer device.
+
+  - Changes to the demand-loading architecture to avoid reading the first
+    block of demand-loaded items twice. Folios are now search for in the
+    following order:
+
+      $folios/<name>.privfolio
+      $folios/<name>.folio
+      $app/folios/<name>.folio
+
+    Note that the extensions are new. These serve as a first test to determine
+    whether a folio is privileged or not (this is of course not the only
+    test, it just is a performance helper).
+
+
+22-Sep-94 (vertex)
+------------------
+
+  - Reduced the amount of time DeleteMsgPort() runs with interrupts turned
+    off.
+
+  - LookupItem() is now faster. This will speed up many many things in the
+    system.
+
+  - When deleting a message port, the kernel now checks to see if the
+    signal bits associated with the message port. If they're not, a message
+    is displayed to the console, so that the problem becomes obvious and
+    the offending code can be fixed.
+
+  - Added the ClearCurrentSignals() and ClearTaskSignals() macros. These
+    let you easily reset signal bits of your task.
+
+
+21-Sep-94 (vertex)
+------------------
+
+  - Added the SampleSystemTime() SWI. This provides a high-accuracy,
+    low-overhead way to measure system time.
+
+
+19-Sep-94 (vertex)
+------------------
+
+  - Fixed a bug where SetItemOwner() would not return the right error number
+    when trying to change the ownership of the IOReq that was in use
+
+  - Fixed security hole where non-privileged tasks could create Driver items.
+
+  - OpenFolio() will now call UnloadFolio() if the folio's ir_Open() vector
+    returns failure, and the open count of the folio is 0.
+
+  - CreateFolio() now validates the memory pointers passed for the various
+    vector tables before accessing them.
+
+  - CreateFolio() now sets the ITEMNODE_UNIQUE_NAME bit in the n_ItemFlags
+    field of all folios. This prevents multiple folios with the same name from
+    being created.
+
+  - DeleteDevice() now accepts any value >= 0 as a successful return from the
+    delete vector of a device, instead of just accepting = 0.
+
+  - CloseDriver() now calls UnloadDriver() if the open count of the driver is
+    0.
+
+  - FreeMemList() now deals with a NULL pointer correctly.
+
+  - Some unused functions and global variables were deleted from the code
+    to save bytes.
+
+
+15-Sep-94 (vertex)
+------------------
+
+  - Added NextTagArg() and FindTagArg(). These finally provide a centralized
+    mechanism to process tag list in a consistent way.
+
+
+14-Sep-94 (vertex)
+------------------
+
+  - Added IsMemReadable() and IsMemWritable(). These are user-callable
+    versions of IsRamAddr() and ValidateMem(). This will let link library
+    code and test code (like ASSERT() macros) check pointers.
+
+  - Added IsItemOpened(). This simply involved making the old ItemOpened()
+    function publically visible, and giving it a new name.
+
+
+12-Sep-94 (vertex)
+------------------
+
+  - DoIO() and WaitIO() are now smarter. In the case where the older versions
+    of these functions would return success, an extra step is now taken. The
+    routines now automatically return the value of the IO request's io_Error
+    field. This eliminates the need to look at both the return value of the
+    function call, and the error value in the IO request.
+
+  - Fixed bug where SetItemOwner() wasn't completely cleaning up after itself
+    upon failure. It could leave some slots erroneously set in the task's
+    resource table.
+
+  - Fixed bug where SetItemOwner() was returning NOMEM when it was unable to
+    extend the task's resource table instead of returning ER_Kr_RsrcTblOvfFlw.
+
+  - Fixed bug where SetItemPriority() would return -1 if the folio that owned
+    the item didn't support setting item priority instead of returning
+    NOSUPPORT.
+
+  - Fixed bug where the kernel's ir_Open vector would return -1 if the second
+    argument was not NULL instead of returning ER_BadPtr.
+
+  - Fixed bug in OpenItem() where if it was impossible to extend the
+    task's resource table to hold an item being created, the failure was
+    being ignore. The result was that the item was not tracked by the system.
+
+
+06-Sep-94 (vertex)
+------------------
+
+  - Allocating new item slots now goes faster. Instead of having to scan
+    the resource and item tables to find empty slots, the free slots are
+    now kept in a list and can be obtained directly. The list is
+    constructed using the empty slots themselves, which means that
+    no extra memory is needed for this feature. In fact, a lot of code
+    was eliminated from the item allocation routine.
+
+
+02-Sep-94 (vertex)
+------------------
+
+  - DoIO() and SendIO() now both define their (IOInfo *) parameter as a
+    (const IOInfo *)
+
+  - SendMsg() and ReplyMsg() now both define their (void *) as (const void *)
+
+  - User-mode items are now looked for in $app/Folios, $app/Devices, and
+    $app/Drivers
+
+
+01-Sep-94 (vertex)
+------------------
+
+  - ReplyMsg() is now about 20% faster.
+
+  - IO requests using message-based notification now have much less CPU
+    overhead, and complete faster.
+
+  - Most (if not all) of the pertinent Kernel functions that take a
+    (char *) as parameters now are defined to take (const char *) instead.
+
+
+27-Aug-94 (vertex)
+------------------
+
+  - ValidateMem() now runs faster, improving overall system performance, and
+    IO specifically.
+
+
+25-Aug-94 (vertex)
+------------------
+
+  - Consolidated much demand-loading code into one central location to save
+    bytes and reduce complexity.
+
+  - If a folio can't be found in $folios, we now look in $appfolios. The
+    same thing extends for devices and drivers, where we also look in
+    $appdevices and $appdrivers for them. This is to allow application-supplied
+    folios, devices, and drivers.
+
+
+17-Aug-94 (vertex)
+------------------
+
+  - DoIO() is now a SWI in the kernel instead of a convenience routine in
+    clib.lib.
+
+  - WaitIO() and CheckIO() are now user vectors in the kernel instead of
+    being convenience routines in clib.lib
+
+  - SuperWaitPort() and SuperWaitIO() are now super vectors in the kernel
+    instead of being convenience routines in clib.lib
+
+All the above changes reduce the OS footprint by avoiding much redundant code
+being linked into every system module. The code is now centralized in the
+kernel. In the case of DoIO(), making the function a SWI allows the function
+to work more quickly, improving system performance.
+
+
+15-Aug-94 (vertex)
+------------------
+
+  - Added a folio cache to make WhichFolio() much faster. The cache simply
+    consists of an array of 16 pointers to folios, indexed by item number.
+    WhichFolio() uses the item number of the folio to find the folio pointer.
+    This is instead of scanning the folio list looking for a folio with the
+    right item number. WhichFolio() is internally used whenever any item
+    manipulation call is made such as CreateItem(), DeleteItem(), OpenItem().
+
+
+12-Aug-94 (vertex)
+------------------
+
+  - Fixed bug where the system would explode if a folio failed to initialize
+    itself when it was being created.
+
+  - Fixed memory leak if any item fails to be created by the responsible folio.
+    Any memory allocated for the name string of the item was not being
+    returned to the system memory pool for all items except for kernel items.
+
+
+10-Aug-94 (vertex)
+------------------
+
+  - SetItemOwner() now works for driver items.
+
+  - Implemented demand-loading for devices and drivers.
+
+  - Fixed memory leak if CreateSizedItem() could not extend the task's
+    resource table.
+
+
+03-Aug-94 (vertex)
+------------------
+
+  - Completed demand-loading implementation for folios. All is well in the
+    world.
+
+  - SetItemOwner() now works for timer items.
+
+
+02-Aug-94 (vertex)
+------------------
+
+  - SetItemOwner() now works for FIRQ items.
+
+  - Improved formatting of output and added more data when an abort occurs.
+
+
+29-Jul-94 (vertex)
+------------------
+
+  - DeleteItem() of a folio item now works. It used to always corrupt the
+    system memory list.
+
+  - When a task or thread closes a folio for the last time, a pass is
+    now made through the item table of that task or thread to delete or
+    close any items belonging to the folio being closed. This will
+    prevent stale items, especially in an environment where folios can
+    come and go from memory. When stale items are found, a message is
+    displayed to warn developers of the fact.
+
+  - SetItemOwner() now works on errortext items.
+
+
+28-Jul-94 (vertex)
+------------------
+
+  - Added FindAndOpenItem() as the main entry point into the demand-loader.
+
+  - SetItemOwner() now works for folio items.
+
+
+27-Jul-94 (vertex)
+------------------
+
+  - First integration of demand-loading code.
+
+
+22-Apr-94 (limes)
+-----------------
+
+* Revised IsRamAddr to disallow low memory (00000 to 00200, same as
+the hardware board).
+
+* This log starts after the "port1_3_base" marking, expected to be the
+Revision 1.3 release of the Portfolio system code.
+

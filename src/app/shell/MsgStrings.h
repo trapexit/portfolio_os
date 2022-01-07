@@ -1,0 +1,16 @@
+#define MSG_NO_FILES			"NO FILE FOUND"
+#define MSG_LOAD_TITLE			"LOAD"
+#define MSG_LOAD_INSTR			"CHOOSE FILE:"
+#define MSG_LOAD_CANCEL			"CANCEL"
+#define MSG_LOAD_NEXT_SAVER		"NEXT SAVER"
+#define MSG_LOAD_PROCESS		"LOAD"
+
+#define MSG_DELETE_TITLE		"DELETE"
+#define MSG_DELETE_PROCESS		"DELETE"
+
+#define MSG_NO_SAVER			"No Saver Available"
+
+
+
+
+

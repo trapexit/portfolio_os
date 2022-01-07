@@ -1,0 +1,28 @@
+$Id: 3DOBoot.doc,v 1.2 1994/10/05 21:53:15 limes Exp $
+
+Wed Oct  5 14:45:33 1994  Greg Limes  (limes@freeside.3do.com)
+
+3DOBoot scripts (by default) come in three flavors: one for anvil
+based systems, one for madam/clio NTSC systems (opera), and one for
+madam/clio PAL systems (operauk). These differ only in which of
+the dipir binaries is loaded at boot time, but the correct one
+must be used.
+
+	3DOBoot.anvil.scr	Development stations using the
+				Anvil chipset (not Madam/Clio).
+
+	3DOBoot.opera.scr	Classic devlopment stations using the
+				Madam/Clio chipset (including the
+				International station) in NTSC mode.
+
+	3DOBoot.operauk.scr	Development stations using the
+				Madam/Clio chipset (mainly the
+				International station) in PAL mode.
+
+It is possible to generate a 3DOBoot script that uses the Creative
+variant of the dipir, but not useful.
+
+We no longer need a separate boot script for each memory size. At boot
+time, the primary operating system module (sherry) will locate the
+other preloaded modules *as*if* it were on a system with 2M of DRAM,
+and move the modules (if needed) to their correct locations.

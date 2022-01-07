@@ -1,0 +1,28 @@
+Mon Apr 25 14:30:13 1994  Greg Limes  (limes@freeside)
+
+	* Provide "SuperSendMsg" and "SuperSendSmallMsg" as analogs of
+	the SendMsg and SendSmall Msg call
+
+	* Remove "SuperPutMsg": the arg list was too short, and it
+	would have encouraged putting messages out with garbage in
+	them.
+
+Mon Apr 25 10:30:00 1994  Martin Taillefer
+
+	* Added SuperCreateMsg(), SuperCreateSmallMsg(),
+	SuperCreateBufferedMsg(), SuperDeleteMsg(), SuperCreateMsgPort(),
+	SuperDeleteMsgPort(), SuperFindMsgPort(), SuperCreateSemaphore(),
+	SuperDeleteSemaphore(), SuperFindSemaphore()
+
+	* Changed the pointer types for SuperControlMem(),
+	SuperIsRamAddr(), and SuperValidateMem() from (char *)
+	to (void *) to avoid needless casting.
+
+Wed Feb  2 14:21:21 1994  Greg Limes  (limes@freeside)
+
+	* Added KernelLibNotes.doc as the release notes for this
+	directory.
+
+	* Fixed folio vector number for SuperGetThisMsg
+
+	* Added entry point SuperPutMsg

@@ -1,0 +1,7 @@
+
+
+21 Sep 1994 (peabody)
+---------------------
+
+  - Added GetTagArg() and DumpTagList() functions to clib.lib (prototypes
+    in tags.h).

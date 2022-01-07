@@ -1,0 +1,101 @@
+
+                       International Folio Release Notes
+                       =================================
+07-Nov-94
+---------
+
+  - Changed the API of intlFormatNumber() in order to correct some design
+    flaws. There were certain types of numbers that could not be generated.
+
+
+
+24-Aug-94
+---------
+
+  - First pass integration of Japanese support
+
+
+02-Aug-94
+---------
+
+  - Made needed changes for demand-loading
+
+
+21.10.251 (27-May-94)
+---------------------
+
+  - Made small changes to the International folio, and to the intl.lib
+    to provide rudimentary demand-loading of the international folio
+
+
+21.10.150 (11-May-94)
+---------------------
+
+  - Added more parameter checking to intlCompareStrings(),
+    intlConvertString(). All parameter checking is now conditional
+    upon #ifdef DEVELOPMENT
+
+  - Added a Spanish language driver
+
+  - Fixed bug in the handling of conversion to uppercase in the
+    english language driver function used by intlConvertString()
+
+
+21.10.120 (09-May-94)
+---------------------
+
+  - Made parameter checking in user-mode functions conditional upon
+    #ifdef DEVELOPMENT.
+
+  - Added extra checking in intlTransliterateString() to make sure the
+    supplied source and destination buffer pointers are valid.
+
+  - Added extra checking in intlFormatNumber() to make sure the
+    NumericSpec structure contains meaningful data.
+
+  - Removed support for NULL NumericSpec parameters in intlFormatNumber().
+    This was fairly useless and was wasting code space.
+
+  - Fixed infinite loop that would occur if the fractional part of a number had
+    to be padded on the right with zeros, in intlFormatNumber().
+
+
+21.10.97 (06-May-94)
+--------------------
+
+  - Fixed bugs in the handling of field width and field limit in
+    intlFormatDate().
+
+
+21.10.60 (05-May-94)
+--------------------
+
+  - Fixed bogus use of ValidateMem() in intlFormatDate() and intlFormatNumber()
+    rendering both functions totally useless.
+
+  - Changed INTL_ERR_BADDATE to INTL_ERR_IMPOSSIBLEDATE, for improved
+    clarity
+
+  - Fixed the comment in intl.h that said the year in a GregorianDate
+    structure could start at 0. It can really only start at 1.
+
+  - Fixed bad bounds checking for the maximum number of days a month
+    in intlFormatDate().
+
+  - Added mnny test cases to the intltest program.
+
+
+21.10.4 (03-May-94)
+-------------------
+
+  - Now applies full sanity checks on memory buffers passed to
+    intlFormatDate() and intlFormatNumber()
+
+  - Now has a semaphore around access to the Locale structure from
+    supervisor mode, to ensure consistency of the structure.
+
+
+21.10.1 (26-Apr-94)
+--------------------
+
+  - Initial release. Greatest thing since sliced bread.

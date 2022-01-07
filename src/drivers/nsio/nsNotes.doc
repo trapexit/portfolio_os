@@ -1,0 +1,34 @@
+
+		 NS16550 Serial Device Release Notes
+		 ===================================
+
+24-Oct-94
+---------
+
+  - Initial skeleton
+
+
+25-Oct-94
+---------
+
+  - Initial ns16550 work.
+
+02-Nov-94
+---------
+
+  - Adjusted as per implementation details
+
+
+09-Nov-94
+---------
+
+  - Found and fixed the kernel bug (in firq.c) preventing
+    us from using INT_PD
+
+  - Implemented enough extra functionality for the shell to
+    use this driver, verified the input functionality was OK
+
+  - Removed the extra functionality (when we want to start
+    doing line mode input, we need to do a decent design, not
+    a quickie hack.)
+

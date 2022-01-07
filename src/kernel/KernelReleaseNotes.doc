@@ -1,0 +1,379 @@
+$Id: KernelReleaseNotes.doc,v 1.11 1994/09/26 16:52:58 vertex Exp $
+
+		    Portfolio Kernel Release Notes
+
+TOPICS COVERED:
+
+ * Anvil Pass 1 Silicon Workaround (3DO INTERNAL ONLY)
+ * New "Asynchronous Call Service" reduces FIRQ latencies
+ * Kernel ram address checking checks for low memory use
+ * Interrupt Service available on any horizontal line
+ * Memory debugging subsystem
+ * Demand-Loading And Dense-Packing Architecture
+
+----------
+
+			  3DO INTERNAL ONLY
+			  -----------------
+	       Anvil Pass 1 Silicon Software Workaround
+		for Hardware Workaround's Side Effect
+
+    If you must use Pass 1 Anvil Silicon, you need to set the most
+    significant bit of the "Anvil Config Word" to zero. On development
+    stations this is easy: in side the Configuration & Preferences
+    window, change the Anvil config word from "fffffdfd" to
+    "7ffffdfd".
+
+    Better still, get Pass 2 silicon. You will be happier.
+
+    On Anvil Testing Stations, you need to have a pull-down resistor
+    installed on SBus bit 31. Be sure that this is removed if the
+    board is upgraded to Pass 2 silicon!
+
+WHAT THIS DOES:
+
+    Pass 1 Anvil Silicon has a bug.
+
+    Fortunately, a hardware workaround has been applied.
+
+    Unfortunately, it has a side effect, which locks up the system.
+
+    Fortunately, turning on the Corner Engine Interrupt causes the
+    lock-ups to go away.
+
+    Unfortunately, this slows down rendering.
+
+    Clearing the MSB of the SBus configuration register enables the
+    software workaround, which keeps your Pass 1 Anvil from locking up
+    but makes rendering go slow.
+
+    Leaving the MSB of the SBus configuration register high turns off
+    the software workaround, so your Pass 2 Anvil can render at full
+    speed.
+
+----------
+
+		   New "Asynchronous Call Service"
+		       to reduce FIRQ latencies
+
+    [This is an initial familiarization report; this service is newly
+    available in the source code but has not yet been tested.]
+
+It is now possible to run functions that take significant processing
+time in response to device FIRQs in such a way that interrupt
+latencies for other FIRQ handlers are not pushed through the roof.
+
+Instead of doing all your interrupt-related work directly in your FIRQ
+handler, carve your interrupt routine into two pieces: the things you
+must do with FIRQs disabled (like make the device stop interrupting,
+or perhaps disabling that device's FIRQ Enable bit) and a separate
+function that can be interrupted.
+
+    Item 	AllocACS(char *name, int pri, void (*code)())
+
+The new "interruptable" service routine is registered during device
+driver initialization (or, for non-device related FIRQ handlers,
+wherever the FIRQ itself is added to the service list) using the
+AllocACS() routine; this routine returns an item number representing a
+request to the system to call your interruptable service.
+
+AllocACS is a privileged kernel call.
+
+    int32	PendACS(Item req)
+
+The actual call is requested by the real (uninterruptable) FIRQ
+handler, by passing the request's item number to PendACS().
+
+The FIRQ management framework then takes care of making the call,
+logically at a "lower interrupt level": when there are no more FIRQ
+requests, the framework shifts from the ARM's FIQ mode to its SRV
+mode, and calls each of the ACS requests with FIRQs enabled, in
+priority order, before returning to the code that was previously
+interrupted.
+
+PendACS should only be called from a FIRQ handler.
+
+If a relatively low priority ACS is interrupted by a FIRQ which
+requests a much higher priority ACS, it is TBD whether (and under what
+circumstances) the higher priority ACS is run before completing the
+low priority ACS.
+
+
+----------
+
+		    Kernel's ram checking modified
+		      to disable low memory use
+
+Accesses by software to very low memory are most often caused by the
+use of uninitialized cells on the assumption that they hold the
+address of an interesting object, or the failure to check for an error
+return from a function that returns a pointer and the subsequent use
+of the NULL pointer obtained.
+
+Applications are now being validated before they go into final
+pressing with a "low memory abort" enhancement to the 3DO development
+station, that is intended to stop applications dead in their tracks if
+they attempt to access the lowest portion of memory. In coordination
+with this, the utility function which reports whether a value is
+indeed a valid memory address has been revised to report these "low
+memory" addresses as not valid, providing another thin layer of
+software protection.
+
+----------
+
+	  Interrupt Service available on any horizontal line
+
+Privilaged code may now register FIRQ handlers to be called on any
+specific horizontal line number of their chosing. Previously, any
+handler that wanted to be called once per vertical blank used INT_V1
+which was configured to trip at "line 5". The new machanism is very
+similar to registering an INT_V1 FIRQ handler:
+
+    Item SuperCreateHLInt( name, pri, code, line )
+	char *name;
+	uint8 pri;
+	int32 (*code)();
+	int32 line;
+
+    name - the name of the interrupt handler. Useful for debugging and
+	finding the HLInt item by name.
+
+    pri - the relative priority of this handler compared to other
+	handlers on the same line.
+
+    code - a pointer to the function to be called
+
+    line - the line number to be matched for the interrupt. It is the
+	responsibility of the caller to make sure that this line
+	number represents a line that occurs once per vertical blank.
+
+----------
+
+                          Memory Debugging Subsystem
+
+Memory debugging provides a general-purpose mechanism to track and validate all
+memory allocations done by an application. Using memory debugging, you can
+easily determine where memory leaks occur within a title, and find illegal uses
+of the memory subsystem.
+
+To enable memory debugging in a title, do the following:
+
+  - Add a call to CreateMemDebug() as the first instruction in
+    the main() routine of your program.
+
+  - Add calls to DumpMemDebug() and DeleteMemDebug() as the
+    last instructions in the main() routine of your program.
+
+  - Recompile your entire project with MEMDEBUG defined on
+    the compiler's command-line (for the ARM compiler, this is
+    done by adding -DMEMDEBUG)
+
+  - Link your code with memdebug.lib
+
+With these steps taken, all memory allocations done by your program will be
+tracked, and specially managed. On exit of your program, any memory left
+allocated will be displayed to the console, along with the line number and
+source file when the memory was allocated from.
+
+In addition, the memory debugging code makes sure that illegal or dangerous
+uses of memory are detected and flagged. Most messages generated by the
+debugging code indicate the offending source file and line within your source
+code where the problem originated from.
+
+When MEMDEBUG is defined during compilation, all standard memory allocation
+calls are automatically vectored through the debugging code. This includes even
+memory allocation calls made inside of previously compiled .lib files you might
+be linking with. However, you can get better debugging information if you
+recompile everything in your project, including .lib files, with MEMDEBUG
+defined.
+
+By calling the DumpMemDebug() function at any time within your program, you can
+get a detailled listing of all memory currently allocated, showing from which
+source line and source file the allocation occured.
+
+Several flags can be specified when initializing the memory debugging subsystem
+by calling CreateMemDebug(). These flags are:
+
+  MEMDEBUGF_ALLOC_PATTERNS
+  When this flag is specified, it instructs the debugging code to fill newly
+  allocated memory with the constant MEMDEBUG_ALLOC_PATTERN. Doing so will
+  likely cause your program to fail in some way if it tries to read newly
+  allocated memory without first initializing it. Note that this option has
+  no effect if memory is allocated using the MEMTYPE_FILL memory flag.
+
+  MEMDEBUGF_FREE_PATTERNS
+  When this flag is specified, it instructs the debugging code to fill memory
+  that is being freed with the constant MEMDEBUG_FREE_PATTERN. Doing so will
+  likely cause your program to fail in some way if it tries to read memory that
+  has been freed.
+
+  MEMDEBUG_PAD_COOKIES
+  When this flag is specified, it causes the debugging code to put special
+  memory cookies in the 16 bytes before and 16 bytes after every block of memory
+  it allocates. When a memory block is freed, the cookies are checked to make
+  sure that they have not been altered. This option makes sure that your
+  program is not writing outside the bounds of memory it allocates.
+
+  MEMDEBUG_DEBUG_ON_ERRORS
+  When this flag is specified, the debugging code will automatically invoke the
+  debugger if any error is detected. Errors includes such things as mangled pad
+  cookies, incorrect size for a FreeMem() call, etc. Normally, the debugging
+  code simply prints out the error to the console and keeps executing.
+
+  MEMDEBUG_ALLOW_OWNER_SWITCH
+  This flag tells the memory debugging code that it is OK for memory to be
+  allocated by one thread, and freed by a different thread. Normally, this
+  condition would be flagged as an error.
+
+----------
+
+                 Demand-Loading And Dense-Packing Architecture
+
+Portfolio V24 supports transparent demand-loading of disk-resident resources.
+The Kernel provides a general-purpose facility to load any type of item from
+disk. The main use of this technology is currently to load folios, devices, and
+device drivers. In the future, other types of items such as fonts or
+user-interface objects can also be loaded using the same services.
+
+As a side-effect of the demand-loading, the system is now also dense-packed.
+Dense-packing is a state in which folios and other system modules share the
+same address space instead of each having their own address spaces. Due to the
+coarce page size of the 3DO architecture, dense-packing can save a substantial
+amount of RAM by eliminating unused areas at the end of multiple address
+spaces, and combining all of these into a single free area at the end of the
+shared address space. This big free area may contain one or more complete pages
+of memory which can be given back to the system free memory pool.
+
+The demand-loading services required modifications to the kernel, the
+operator, the shell, kernel.lib, and all current folios and their
+respective glue routines. Below is an explanation of the major changes.
+
+
+Architectural Overview
+----------------------
+
+The demand-loading architecture is a natural extension of the current
+Portfolio software. Each supervisor-mode folio can provide a routine
+that the kernel will call when it needs to load an item for that folio.
+This works much the same way as the other item-creation callback
+routines that already exist.
+
+When user-code calls the new FindAndOpenItem() routine, the kernel does
+the following:
+
+  - Attempt to find the requested item in memory.
+
+  - If the item is found, open it and return to the caller.
+
+  - If the item is not found, call the pertinent folio's LoadItem
+    routine.
+
+  - If the LoadItem() routine returned success, try to open the resulting
+    item and return to the caller.
+
+Each folio is responsible for providing a routine to load items from disk
+into memory. The kernel itself uses this mechanism in order to allow
+folios to be demand-loaded.
+
+In theory, the LoadItem() routine inside each folio simply needs to
+load the needed data from disk, and create an item for that data. A
+complication arises with the fact that the LoadItem() routine is invoked
+in supervisor mode, and it is generally not possible to perform most
+filesystem calls from supervisor mode.
+
+The solution to the above problem was the creation of two user-mode
+servers that handle disk IO requests for supervisor-mode clients.
+One of these servers is maintained by the operator, while the other is
+maintained by the shell. The reason for the two servers is that the
+operator provides a privileged (secure) server facility, while the shell
+is not secure.
+
+As an example of how these servers are used, consider what happens when the
+kernel needs to load a folio from disk. Inside of the kernel's LoadItem()
+routine, a data packet is created and a call to the UserModeService()
+function is made. UserModeService() creates a message and sends it to
+the operator or the shell to have them perform the disk IO and load the
+folios into memory. The decision whether to use the operator or the shell
+is based on whether a privileged folio is being launched.
+
+Since the operator or the shell are doing the disk loading, the code and data
+for demand-loaded folios resides in the same address space as the code for the
+server that loaded them. That is, privileged folios reside in the operator's
+address space, while user-mode folios reside in the shell's address space. This
+sharing of address space is what provides the dense-packing characteristics of
+this architecture.
+
+Both the operator and the shell create message ports to receive requests from
+supervisor code. Once the ports created, they both call the ProvideServices()
+function included in kernel.lib, to handle incoming messages. This guarantees
+that the behavior of both subsystems is identical, except that their address
+spaces differ.
+
+Once the code for a folio has been loaded into memory, the operator or the
+shell then jump into the main() routine of the folio. The main() routine
+must create the folio item, and return the item number to the caller.
+
+
+Portfolio Changes For Demand-Loading
+------------------------------------
+
+Here is a list of the major changes made to the kernel in support of
+demand-loading:
+
+  - FindAndOpenItem() was defined in folio.h and implemented in the kernel.
+    This is where the demand-loading technology is accessed.
+
+  - FindAndOpenNamedItem() was defined in folio.h and implemented in clib.lib.
+    This is to be consistent with the existing FindNamedItem() routine in
+    clib.lib.
+
+  - FindAndOpenFolio() was defined as a macro in folio.h. To be consistent
+    with FindFolio().
+
+  - FindAndOpenDevice() was defined as a macro in folio.h. To be consistent
+    with FindDevice().
+
+  - The Er_Kr_CantSetOwner and Er_Kr_FolioStillOpened error codes were
+    added in operror.h.
+
+  - The ItemRoutine structure was extended with an ir_Load vector.
+
+  - The f_DemandLoad field was added to the Folio structure.
+
+  - The ITEMNODE_PRIVILEGED bit flag definition was added to nodes.h.
+    This indicates that the item is a privileged item, and should be
+    handled by the privileged server.
+
+  - The dev_Extension field was added to the Device structure, and the
+    DeviceExtension structure was created.
+
+  - The drv_DemandLoad field was added to the Driver structure.
+
+  - SetItemOwner() was modified to allow the ownership of Folio, ErrorText,
+    FIRQ, Drivers, and Semaphore nodes to be changed.
+
+  - When a task or thread closes a folio and it no longer has any opens on
+    that folio, a pass is now made through the item table of that task or
+    thread in order to close or delete any items having to do with the
+    folio being closed. In other words, if you still have some allocated
+    items when you close the folio, those items will now become invalid.
+    A message is printed to the console when this happens to warn
+    developers of this situation.
+
+  - DeleteItem() on a folio item no longer corrupts the supervisor memory list.
+
+  - DeleteItem() on a folio no longer deletes the folio if its open count
+    is greater than 0, and returns an error instead.
+
+  - CreateItem() on a folio no longer crashes if the folio fails to
+    initialize itself fully.
+
+The only change to the operator is:
+
+  - The operator now creates a message port called PrivUserServer and
+    calls ProvideServices() to drain that port.
+
+The only change to the shell is:
+
+  - The shell now creates a message port called NonPrivUserServer and
+    calls ProvideServices() to drain that port.

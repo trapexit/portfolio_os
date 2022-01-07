@@ -1,0 +1,1377 @@
+$Id: AudioRelease.txt,v 1.67 1995/01/04 00:21:01 peabody Exp $
+Release Notes for Audio Folio, Music Library, and related audio files
+
+Phil Burk and Bill Barton
+
+Version History
+
+11/31/94
+
+    audio folio ---------------------------
+
+    Shared Templates - in an effort to save code memory, DSP instruments can
+    now contain shared subroutines that are loaded automatically. The first
+    instrument to support this is varmono8_s.dsp. If you require several
+    varmono8 instruments, use this "varmono8_s.dsp" instead of "varmono8.dsp".
+    Instruments loaded after the first instrument will use a subroutine
+    contained in the first instrument. If you onlyneed one instrument, it is
+    better to use the original version.
+
+    Half Rate DSP Execution - in an effort to save execution cycles,
+    DSP instruments can now be run at half the normal sample rate.
+    If you are running out of ticks, then run some instruments at half rate.
+    The output sample rate is half so fidelity is degraded.
+    Fixed rate instruments will play an octave lower.
+    Variable rate instruments played using AF_TAG_PITCH will
+    adjust their pitch correctly although the maximum pitch will
+    be 1/2 of the previous maximum.  Half rate instruments should
+    be allocated in pairs to make most effective use of this feature.
+    See documentation for CreateInstrument, AF_TAG_CALCRATE_DIVIDE
+    for more information.
+
+    A bug in SetAudioItemInfo() for samples has been corrected. If you
+    accidentally pass illegal parameters to SetAudioItemInfo() it
+    will no longer corrupt the sample values.  The sample will be left
+    in the same state it was before calling SetAudioItemInfo().
+
+    Some improvements to the handling of instrument state have been made.
+    If you call StartInstrument() on an instrument that is running,
+    it will do a complete stop before being restarted.
+
+    Attachments with AF_ATTF_NOAUTOSTART set  will no longer
+    accidentally start playing if you call:
+          PauseInstrument()
+          StopInstrument()
+          StartInstrument()
+
+    The audiofolio will now correctly load AIFF files that loop
+    and have a MARK chunk after the INST chunk.  This bug prevented
+    the audiofolio from loading samples compressed by SoundHack
+    that had loops.
+
+    The NumBits parameter for samples is now correctly recalculated
+    if you change the width using AF_TAG_WIDTH.
+
+    Fixed the DMA errors that could occur if AF_TAG_STARTAT was
+    accidentally past the end of the sustain loop in a sample.
+    Also corrected DMA errors for zero length loops.
+
+    Prevented unnecessary interrupts from occuring for samples with release
+    loops and MonitorAttachment() or the the FATLADYSINGS bit set. The
+    interrupt was causing a 2% performance loss per looping sample. BTW, there
+    is little point in using MonitorAttachment() or FLS bit for samples
+    with release loop because they never finish.
+
+    Fixed roundoff error that was causing load problems with odd length
+    compressed samples.
+
+    DisconnectInstruments() now restores the functionality of Knobs
+    on the destination instrument. Knobs used to not work after
+    one had used ConnectInstruments() to connect a signal to a Knob,
+    then disconnected.
+
+11/12/94
+
+    audio folio ---------------------------
+
+    Removed MakeSample() prototype from audio.h. This function is now obsolete,
+    but is maintained in the audio folio for backwards compatibility. For new
+    code, use CreateSample() instead.
+
+10/13/94
+
+    music.lib -----------------------------
+
+    Original sound file player now asks the file system for block size
+    rather than assuming it is always 2048 bytes.
+
+10/11/94
+
+    audio folio 23.10 10/11/94 16:33:47 ---
+
+    Hid the prototypes for a few internal functions:
+
+        ReservedAudioSWI1()
+        TestHack()
+        PrivateInternal()
+        IncrementGlobalIndex()
+
+    Removed the prototypes and glue for following unimplemented functions:
+
+        FindAudioDevice()
+        ControlAudioDevice()
+        GetNumInstruments()
+        GetMasterTuning()
+        SetMasterTuning()
+        DSPGetMaxTicks()
+
+    The implementation, what there was of it at any rate, is still intact
+    in the audio folio in case someone actually was calling these. Most of
+    them just return AF_ERR_UNIMPLEMENTED as they have always done.
+
+10/10/94
+
+    audio.lib (private) -------------------
+
+    Added SuperSetAudioFolioInfo() and SuperSetAudioFolioInfoVA():
+    supervisor entry point for SetAudioFolioInfo().
+
+10/4/94
+
+    music.lib -----------------------------
+
+    Added ssplGetSpoolerStatus() to sound spooler. This subsumes the
+    functionality of ssplIsSpolerActive() (which is preserved as a macro).
+
+10/4/94
+
+    music.lib -----------------------------
+
+    Revised advanced sound player API after review:
+
+    1. create/delete documentation clarified wrt precisely what is freed
+       when a delete call is called (includes spDeletePlayer(),
+       spRemoveSound(), spRemoveMarker()).
+
+    2. create functions that return pointers now have the following form:
+
+        Err spCreatePlayer (SPPlayer **resultPlayer, ...)
+
+    3. spGetPlayerSignals() changed to spGetPlayerSignalMask()
+
+    4. Added the following functions:
+
+        SPPlayer *spGetPlayerFromSound (const SPSound *);
+        SPSound *spGetSoundFromMarker (const SPMarker *);
+
+    5. Added tsp_spoolsoundfile.c (version of spoolsoundfile.c that uses
+       the advanced sound player).
+
+    6. Reformatted examples to fit in 80 columns.
+
+    7. Changed typedef names to use an upper-case prefix 'SP'.
+
+    8. Replaced spGetPlayerState() w/ spGetPlayerStatus() which returns a
+       more informative set of flags rather than a state enum value.
+
+    9. Replaced SPAction system (the result of an SPDecisionFunction)
+       with a less obtuse mechanism.
+
+    10. Added spGetMarkerName() and spGetMarkerPosition().
+
+9/21/94
+
+    audio folio 23.10.268 -----------------
+
+    Added GetAudioFolioInfo() to query system-wide audio settings.
+    Will be available in audio folio V24.
+
+9/8/94
+
+    music.lib -----------------------------
+
+    Added ssplUnrequestBuffer() to sound spooler to return an
+    unused SoundBufferNode to the free queue.
+
+    Added a resource tracking system in sound spooler to prevent
+    loss of SoundBufferNodes in case client fails to use one
+    returned by ssplRequestBuffer(). The sound spooler used to lose
+    memory and track of a couple of items if this happened.
+
+8/24/94
+
+    dsp -----------------------------------
+
+    Added several new DSP instruments:
+    add.dsp
+       code=6, ticks=6
+       Output = InputA + InputB  (clipped)
+    benchmark.dsp
+       code=6, ticks=6
+       Output is current Tick count.  Used by ta_faders.c for more
+       accurate benchmarking of DSP.
+    adpcmvarmono.dsp
+       code=70, ticks=108
+       Variable rate ADPCM decoding. Freq range is 0 -> 0x8000 only.
+    dcsqxdvarmono.dsp
+       code=56, ticks=59
+       Variable rate SQXD decoding. Freq range is 0 -> 0x8000 only.
+    subtract.dsp
+       code=6, ticks=6
+       Output = InputA - InputB  (clipped)
+    maximum.dsp
+       code=11, ticks=12
+       Output = MAX(InputA,InputB)
+       This can be used for clipping.
+       By connecting Output to InputB, you can measure a historical maximum.
+    minimum.dsp
+       code=11, ticks=12
+       Output = MIN(InputA,InputB)
+       This can be used for clipping.
+       By connecting Output to InputB, you can measure a historical minimum.
+
+8/9/94
+
+    music.lib -----------------------------
+
+    Added Advanced Sound Player package to music.lib (see spCreatePlayer()
+    and soundplayer.h). Will be available in music.lib V24.
+
+8/8/94
+
+    audio folio -----------------
+
+    CompressionRatio < 1 for a sample now rejected as an error.
+
+    dsp -----------------------------------
+
+    The dsp instruments fixedstereosample.dsp and fixedstereo16swap.dsp
+    had a bug fixed.  The bug could cause the stereo left/right to be reversed
+    sometimes from their normal side whan StartAttachment() was called.
+    fixedstereosample.dsp had a 0.7% probability of being switched.
+    fixedstereo16swap.dsp had a 2% probability of being switched.
+
+8/5/94
+
+    audio folio 22.10.234 -----------------
+
+    Made audio folio demand loadable. Among other things, this involved
+    changing the file name from $folios/audiofolio to $folios/audio.
+
+    Currently the operator automatically starts the audiofolio during boot
+    since it's always been there up 'til now. There is no longer a command
+    in startopera script to launch the audio folio.
+
+7/14/94
+
+    audio folio ---------------------------
+
+    Added varargs versions of all audio folio functions that take TagArgs
+    (e.g. StartInstrumentVA()).
+
+7/7/94
+
+    audiofolio ----------------------------
+
+    AttachEnvelope() now uses the default name "Env" when passed a NULL
+    name.
+
+6/15/94
+
+    examples ------------------------------
+
+    Added ta_delay.c to examples.
+
+6/8/94
+
+    audiofolio ----------------------------
+
+    Caller to SetAudioFolioInfo() must now be priveledged.
+    SetAudioFolioInfo() now adjusts the ticks available
+    based on the Samplerate.
+
+    Optimised several DSP instruments. The following changes
+    were then made to the DSP instrument statistics document.
+
+Instrument            Cod Tks  => Cod Tks   Comment
+-----------------------------------------------------------------
+adpcmhalfmono.dsp     xx  xx   =>  71 103   new
+directin.dsp          xx  xx   =>   6   6   new
+fixedmonosample.dsp   10  15   =>   6   6   optimised
+fixedstereo16swap.dsp 42  46   =>  38  46   optimised
+fixedstereo8.dsp      19  39   =>  15  15   optimised
+fixedstereosample.dsp 16  23   =>  10  10   optimised
+halfmonosample.dsp    28  30   =>  23  21   optimised
+halfstereosample.dsp  xx  xx   =>  44  36   new
+pulse.dsp             xx  xx   =>  14  13   new
+pulse_lfo.dsp         xx  xx   =>  23  24   new
+randomhold.dsp        13  25   =>  13  15   recalibrated
+square.dsp            xx  xx   =>  12  13   new
+square_lfo.dsp        xx  xx   =>  16  17   new
+svfilter.dsp          22  22   =>  19  19   optimised
+triangle_lfo.dsp      xx  xx   =>  23  24   new
+varmono8.dsp          67  37   =>  50  38   updated document
+
+
+6/6/94
+
+    audiofolio ----------------------------
+
+    Added CompareAudioTimes(), AudioTimeLaterThan() and
+    AudioTimeLaterThanOrEqual() macros to audio.h. These macros should be
+    used for comparing AudioTime quantities because they deal with the
+    wraparound condition. If you just compare times using (t1>t2) then
+    your app could break when the clock wraps at 109 days after boot.
+
+6/6/94
+
+    music.lib -----------------------------
+
+    Modified score player to permit assigning more than one voice
+    to a single MIDI note number.
+
+    audiofolio ----------------------------
+
+    Added time stamp comparison to ScavengeInstrument().
+
+    Fixed bug in conversion of NumBytes to Frames for samples.
+    If you had a 2:1 compressed sample, and tried to set both
+    AF_TAG_FRAMES and AF_TAG_NUMBYTES to an odd value in the
+    same call to SetAudioItemInfo(), they would be reported
+    as unequal and return an error. This may have also affected
+    the setting of loop points at the end of 2:1 compressed samples.
+    The problem was due to roundoff error in the conversion.
+
+5/31/94
+
+    music.lib -----------------------------
+
+    Made ssplCreateSoundBufferNode() and ssplDeleteSoundBufferNode() functions
+    internal only. This was done because these functions do not actually
+    perform as advertised and could really only be used as low level functions
+    by ssplCreateSoundSpooler() and ssplDeleteSoundSpooler() without a major
+    overhaul. Anyone using them would have discovered this pretty quickly. If
+    there is sufficient demand, ssplCreateSoundBufferNode() and
+    ssplDeleteSoundBufferNode() could be reworked to behave as described, but
+    until then, they no longer exist.
+
+5/7/94 21.10.577
+
+    audiofolio ----------------------------
+
+    Fixed a bug in envelope creation and modification that failed to
+    return an error code for bogus loop points. It now returns
+    AF_ERR_BADTAGVAL when you try to set invalid loop points.
+
+5/27/94
+
+    music.lib -----------------------------
+
+    Added new SoundBufferFunc callback system to sound spooler.
+
+5/7/94 21.10.489
+
+	audiofolio ----------------------------
+
+	Added SetAudioFolioInfo() to allow cable apps to
+	inform audiofolio of DAC sample rate changes.
+	Also provides master gain control for muting.
+	Uses new head.dsp.
+
+5/5/94
+
+	audiofolio ----------------------------
+
+	Made envelopes wait at least 1 timer tick to allow very fast
+	attacks to rise properly.  Was rounding to zero delay. "EA laser fix"
+
+
+4/29/94
+
+	audiofolio ----------------------------
+
+	MakeSample() no longer returns an error code if you mistakenly
+	pass NumBytes, and also pass an address via TagList.  This was
+	to prevent some errant apps from crashing.
+
+4/27/94 Anvil D1
+
+	audiofolio ----------------------------
+
+	Added Audio Input support for Anvil. Here's how:
+
+	Enabled = EnableAudioInput( TRUE, NULL );
+	ADCIns = LoadInstrument( "directin.dsp", 0, 100 );
+	ConnectInstrument( ADCIns, "OutputLeft", SVFilter, "Input" );
+
+	TuneInsTemplate() has been implemented since 4/6/94
+
+	Fixed DSPReadEO taglist bug (internal bug, never actually in a release
+    version of audiofolio)
+
+4/22/94
+
+    patchdemo -------------------
+
+    Added delay line support.
+
+4/19/94
+
+    includes --------------------
+
+    audio.h 1.61: Restored #include <> back to "" to keep examples
+    building without massive changes to the build scripts.  The <>'s will
+    reappear in the next release.
+
+4/15/94
+
+	music.lib -----------------------------
+
+	Fixed a bug that was only present in the alpha version that
+	caused the dsp instrument used by the soundfile player to not
+	be deleted by UnloadSoundFile().
+
+4/14/94
+
+	audiofolio ----------------------------
+
+	Fixed bug that caused instruments with more than one envelope
+	to possibly hang if the FATLADYSINGS bit was set for an envelope.
+
+	Fixed a time comparison that could cause a glitch in the timer
+	after 109 days of continuous operation.
+
+4/13/94
+
+    music.lib -----------------------------
+
+    Split score.o into 3 modules:
+        . score_mfloader.o - score player's MIDI File loader
+        . score_pimaploader.o - PIMap loader
+        . score.o - lower level score player functions
+
+    The main benefit from this comes from moving the MIDI file loading
+    stuff into a separate module since it depends on midifile.o,
+    flex_stream.o, and juggler.o.  A score player client that doesn't
+    require the MIDI file loader will now be about 9K smaller.
+
+4/12/94
+
+    audiofolio ----------------------------
+
+    Fixed low mem hit in GetAudioItemInfo() that occurred when it was fed
+    a bad item number.
+
+4/11/94
+
+    examples ------------------------------
+
+    Retired patchdemo.rtf in favor of the patchdemo docs prepared by the
+    documentation folks.
+
+4/7/94
+
+	audiofolio ----------------------------
+
+	Reduced size of dev version by 22K by removing TRACE messages,
+	and some ERR messages.  Compile them with DEBUG_AUDIO flag.
+
+4/5/94
+    testprograms (examples) ---------------
+
+    Changed list of files published in the testprograms (examples/audio)
+    directory:
+        . removed
+            . cobj.h, handy_tools.h, iff_fs_tools.h, juggler.h,
+              midifile.h, music.h, score.h, soundfile.h
+                  - these are part of O/S and should never have been placed
+                    in the testprograms directory.
+            . joytools.c - not for release
+            . leftright.arm - not for release
+            . loopsoundfile.arm, loopsoundfile.c - not for release
+            . ta_define.arm - not for release
+            . ta_dualsaw.arm - not for release
+            . ta_freqresp.arm - not for release
+            . ta_polyphony.arm - not for release
+            . ta_printins.arm - not for release
+            . tg_lines.arm - not for release
+
+        . added
+            . patchdemo.*, pd_*.c, *.patch - PatchDemo set
+            . ta_spool.arm, ta_spool.c
+
+    dsp instruments ---------------
+
+    Changed list of published dsp instruments:
+        . removed
+            . thru.dsp - test instrument that should not have been released
+
+        . added
+            . adpcmhalfmono.dsp
+            . delay1tap.dsp
+            . pulse.dsp
+            . pulse_lfo.dsp
+            . randomhold.dsp
+            . square.dsp
+            . square_lfo.dsp
+            . triangle_lfo.dsp
+
+4/4/94
+
+	music.lib ---------------
+
+	Fixed bug in PitchBend handling.  ConvertPitchBend wasn't
+	centered at 0x2000.  New notes did not get current channel
+	bend value.
+
+4/3/94
+
+	PatchDemo released by Bill Barton.  This 3DO based application will
+	read a text file that describes a patch constructed out of dsp
+	instruments, builds it, and lets you tweak its knobs.  See the examples
+	folder for some sample patches.  Preliminary documentation is also available.
+	The set consists of the following files:
+	    . patchdemo.arm - program
+	    . patchdemo.rtf - documentation (can be read w/ MS Word)
+	    . *.patch - sample patches
+	    . patchdemo.c, patchdemo.h, pd_faders.c, pd_patch.c - source code
+
+3/21/94
+
+	audiofolio ----------------
+
+	Fixed pointer arithmetic bug in DMA control that was needed to counteract
+	a very old compiler bug.  Now works with all the recent ARM compilers.
+
+	music.lib -----------------
+
+	New SoundSpooler available.  This tool allows an application to pass
+	blocks of audio data to the audiofolio for playback.  It manages a queue
+	of blocks and signals the application as they are played. This code
+	is curently being used in the DatStreamer and in the music.lib sound
+	file player.
+
+3/9/94
+
+	audiofolio 20.28.205 --------
+
+	OpenAudioFolio() now waits until the folio is completely ready.
+	This eliminates the possibility of race conditions on startup
+	between the folio and the application.  A delay will no longer be needed
+	in the StartOpera script for the audiofolio.  Other folios may still
+	need the delay.  This was implemented by using semaphores in
+	the folio open vector.
+
+3/4/94
+
+	includes --------------------
+
+	audio.h no longer includes the following include files:
+	    . device.h
+	    . driver.h
+	    . filesystem.h
+	    . folio.h
+	    . io.h
+	    . stdio.h
+
+	audio.h now uses <> instead of "" for refering to include files that
+	it includes.  This requires using the following compiler options:
+	    -wp - do not warn about non-ANSI files in #include <foofile.h>
+	    -J  - instead of -I for include path to avoid getting ARMCC built-in
+	          include files (e.g. uses 3DO stdio.h instead of ARMCC built-in
+	          stdio.h).
+
+2/27/94
+
+	audiofolio 20.28.152 --------
+
+	Share .dsp templates.  If a .dsp template is loaded more than once,
+	the later ones will not go to disk but will simply share the dsp
+	information.  This will reduce disk access and will speed up LoadPIMap().
+
+	music.lib ---------
+
+	Use SoundSpooler tool to improve ServiceSoundFile().  Use asynchronous
+	file I/O so that ServiceSoundFile() will not block as long.
+
+----------- New Version Numbering -------------------------
+
+20.??.75 - 1/20/94 - JANUARY RELEASE
+
+	audiofolio --------
+
+	Use actual timer tick value generated by DSPP to advance audio timer.
+	This will prevent timer drift if interrupts are lost due to
+	overly long interrupt disables.
+
+	music.lib ---------
+
+	Remove "instrument used" message from LoadSoundFile() to avoid delay.
+
+20.??.74 - 1/20/94
+
+	audiofolio --------
+
+	Remove BETA message.
+	Remove "DMA not stopped" message that appeared because of compiler
+	optimisation.  It is safe.
+
+	music.lib ---------
+
+	LoadPIMap() now handles TABs in PIMap text file correctly.
+
+20.24.73 - 12/22/93
+
+	Rewrote playmf.c as simpler pmf routines to improve clarity.
+
+	music.lib ---------
+
+	ServiceSoundFile() now uses Asynchronous file I/O to prevent blocking of
+	spooling task.
+
+	Fixed GetObjectInfo() for Collections with JGLR_TAG_MANY and for
+	Sequences for superclasses tags.
+
+	audiofolio --------
+
+	Fixed range checking for AllocAmplitude() and FreeAmplitude().
+
+	Added AF_TAG_CURRENT for GetAudioItemInfo for Knobs.
+	Returns current value after any conversion has occured. Should match
+	TweakRawKnob().  Optimised.
+
+	Added AbortTimerCue() to cancel a SignalAtTime() request.  Tested
+	using ta_timer.c
+
+	Fixed bug in V72 DSPPNextAttachment - internal issue.
+
+	Deallocate external entry point reference for shared DSP routines.
+	Fixed minor memory leak in ADPCM usage.
+
+20.24.72 - 12/20/93
+
+	audiofolio --------
+
+	Fixed problem with LinkAttachment() killing sustain loops.  Allow multiple
+	ReleaseInstrument calls for linked attachments with sustain loops.
+
+20.24.71 - 12/15/93
+
+	audiofolio --------
+
+	Added CreateSample(), CreateInsTemplate().
+
+	Made name matching case insensitive for ConnectInstruments()
+	and GrabKnob()
+
+20.24.70 - 12/??/93
+
+	audiofolio --------
+
+	Implemented PauseInstrument() and ResumeInstrument()
+
+	music.lib ----------
+
+	Fixed new memory leak in MFLoadCollection introduced in V67.
+
+	Fixed crash with invalid juggler objects if one played a new
+	score after deleting an old score that was stopped before it ended.
+
+20.24.69 - 12/01/93
+
+	audiofolio --------
+
+	Attachments are now tracked properly for templates as well as
+	instruments.  Before this, if one attached a single sample to multiple
+	templates, then one would get an "Unknown Slave" error when one deleted
+	a template.
+
+	Fixed bug with FATLADYSINGS and looping samples.  The release portion
+	of a sample after a sustain loop was getting cut off by the FATLADYSINGS
+	bit.  This was causing some pops and also causing instruments to cut
+	out unexpectedly.  Also fixed bug where samples between sustain and
+	release loop were not getting played.
+
+	The detune value for samples is now taken into account when calculating
+	the Base Frequency.  The value can range from +/1 100 Cents.  The value in
+	an AIFF file can range from +/- 50 Cents.  A positive detune value raises
+	the pitch when played.
+
+	Convert12TET_F16( int32 Semitones, int32 Cents, frac16 *FractionPtr )
+	added.  This converts an interval in Semitones and Cents to a fractional
+	value that can be used with BendInstrumentPitch().  S=0,C=0 => Fr=1.0
+	S=12,C=0 => Fr=2.0 ; S=-12,C=0 => Fr=0.5
+
+	AF_TAG_PRIORITY <uint32>  can be used with GetAudioItemInfo() for
+	Instruments to get the instrument priority.
+
+	AF_TAG_START_TIME <uint32>  can be used with GetAudioItemInfo() for
+	Instruments to get the time the instrument was started.
+
+	AF_TAG_TIME_SCALE <frac16>  allows time scaling of envelopes.  This allows
+	an app to scale envelopes based on PITCH or VELOCITY.  MICROSPERDELTA now
+	supports envelope time units other than milliseconds.
+
+	music.lib ---------
+
+	LoadPIMap now support a -d option for detuning the sample. Value is in
+	Cents.  A positive value raises the played pitch.
+
+	Added PurgeScoreInstruments() and (*scon_PurgeHook)() to allow
+	applications to share voice allocation with ScoreContext.
+
+20.20.68 - 11/17/93
+
+	audiofolio --------
+
+	Clear head of DSPP FIFOs when sample started to reduce pops.
+
+	MonitorAttachment() now works for envelopes. See ta_envelope.arm.
+
+	WhereAttachment() now works for envelopes. See ta_envelope.arm.
+
+	Fixed crash when RELEASEJUMP point set to last point in envelope. See ta_envelope.arm.
+
+	CreateCue(Tags) and DeleteCue(Cue) macros added to audio.h
+
+	music.lib ---------
+
+	Moved SelectSamplePlayer() to own file to reduce size of applications
+	that want to use soundfile spooler.
+
+	LoadPIMap now recognises .aifc and .aif as samples, now case insensitive.
+
+20.20.67 - 11/10/93
+
+	audiofolio --------
+
+	SetItemPriority now works for Audio Items.
+
+	DSP Instruments added
+		samplermod.dsp
+		halfstereosample.dsp
+
+	music.lib ----------
+
+	Fixed hang in sound spoooler at end of file that was delayed.
+
+	Reordered reads in RewindSoundFile() so that drive head is left on data.
+	This should eliminate some problems with starting a soundfile cleanly.
+
+	PitchBend support added.
+
+	Reallocate MIDI File sequence data after load to save memory.
+
+20.20.66 - 10/28/93
+
+	GetAudioItemInfo() now supports AF_TAG_STATUS for instruments. Returns
+	AF_ABANDONED, AF_STOPPED, AF_RELEASED, or AF_STARTED.
+
+	CloseAudioFolio() no longer returns a -1 if called from multiple threads.
+
+	music.lib ----------
+
+	 Mute fixed in score player for MIDI scores with running status.
+
+20.20.65 - 9/93
+
+	Fixed: If one called CreateDelayLine() then tried to get rid of it with
+		UnloadSample(), it would attempt to delete the delay line
+		memory in user mode.  Since it was allocated in supervisor mode
+		this would fail with a fence violation.
+
+20.18.64 - 9/8/93 - released on Sampler CD
+
+	Use FIFOINIT to clear FIFOs before starting samples, and to disable DMA
+	on Initialization.
+
+	Initialize allocated I memory to zero to reduce pops and DC offsets.
+
+20.17.63 - 9/4/93 - OFFICIAL RELEASE 1.1
+
+	Allow deletion of dependant items from parent item.  For example
+		all attachments for a sample will be deleted when the sample
+		is deleted.  This prevents the "wild write" that could occur
+		when dependant items were later removed from a dead parent's list.
+
+20.17.62 - 8/30/93
+
+	Add more stringent error checks for:
+		MonitorAttachment() - only accept CUE_AT_END
+		Attachments - check for illegal flags
+		LoadInsTemplate - AudioDevice must be zero
+		Knob calls return proper error code for BadItems instead of 1.
+		TuneInstrument checks tuning item properly.
+		Check for negative counts for envelopes, tunings.
+		Number of channels for samples must be from 1-255.
+
+	Score.c - InitScoreMixer calls UpdateChannelVolume correctly.  This may
+		have caused low volumes on higher MIDI channels.
+
+	DisconnectInstrument now works if connected to Knob
+
+	Disallow AudioDuration greater than 32767
+
+20.14.61 - 8/24/93
+
+	NAME chunks from Aria files no longer cause a memory leak.
+
+	DHDR chunks placed in .dsp files to aid future compatibility.
+	CRDC chunks allowed for Aria instruments future compatibility.
+	Warning given for obsolete instruments that do not have the above chunks.
+
+	Score player properly disconnects instruments when freed to avoid squeeks and
+	squawks.
+
+	IFF file parser properly seeks to end of chunk regardless of Custom
+	Handler activity.
+
+20.14.59 - 8/12/93
+
+	Audio programs must be relinked with new audio.lib!!!!
+
+	if (Kernel version > 19)  use SuperInternalFreeSignal()
+	to avoid problem when task with Cues are killed.
+
+	Moved GetAudioTime() to user level folio call.
+	Applications will need to be relinked to take advantage of future
+	folio stuff.
+
+	ta_faders.c now takes a sample file name to play
+
+	If SleepUntilTime() or SignalAtTime() are called from
+	a task that does NOT own the Cue, an error is returned
+	because they won't wake up.
+
+int32 EZMemSetCustomVectors( void *(*AllocVector)(int32 Size, uint32 Type),
+	 	void (*FreeVector)(void *p, int32 Size) )
+	 added to allow the user of the music.lib to specify how
+	 memory will be allocated.  Score and Juggler also use this.
+	 Only set once before making any calls, or not at all.  Do not change
+	 once set.
+
+int32 MFDefineCollection ( MIDIFileParser *mfpptr, char *Image, int32 NumBytes, Collection *ColPtr)
+	added to allow a MIDIFile to be loaded from memory instead of from disk.
+	Added FlexStream tool to support this.
+
+	Calling Audio routines from a thread that did not OpenAudioFolio()
+	is now trapped as an error.
+
+	Some other bugs related to Item deletion by the Shell were also
+	fixed including the DSPPUnImportResource: Could not find external = %&$
+
+20.11.58 - 8/9/93
+
+	Added AF_TAG_RELEASEJUMP <index> which allows you to
+	specify a point to jump to upon release.  This handy for piano like
+	envelopes that have a long slow decay until you release when they drop
+	to zero quickly.
+
+	Added extra checks for illegal flags to allow future upgrades.
+
+	PIMaps can now have blank lines.
+
+	SoundFilePlayer now has a SFP_NO_DIRECTOUT flag that can
+	be used to disable use of the directout instrument.  This
+	allows you to connect the spooled sound to whatever you want.
+
+	DSP files optimised, 2 NOPS removed from front make them incompatible
+	with old folios.
+
+8/3/93
+
+	halfmonosample.dsp added for 22 Khz 16 bit mono samples.
+	music.lib now supports halfmonosample.dsp
+
+0.0.57 - 7/30/93 - DragonTail3
+
+	Fixed possible overindexed string in AttachEnvelope().
+
+	Fixed error checking for NumBytes and NumFrames for
+	samples items.  Used to say they didn't match for MakeSample().
+
+	Improved delay line internals.
+
+0.0.56 - 7/30/93
+
+	Fixed inconsistency with the way sample width is handled
+	for compressed samples.  Now width is the uncompressed width
+	in bytes.  Thus a 16 bit sample in 4:1 ADPCM format should have
+	a width = 2 bytes.
+
+	Fixed voice allocation problem in music.lib that caused
+	failures if a template was used on more than one channel
+	at a time.  Other voice allocation improvements.
+
+0.0.55 - 7/28/93
+
+	Fixed stuck note bug in music.lib.
+	Fixed running status bug in MIDI file reader in music.lib.
+	Fixed bug that caused notes that had no matching multi-sample
+		range to still play.
+
+0.x.54 - 7/23/92
+
+	Fixed bug in DSPPGoToAttachment() that caused looping in
+	streamer for non-zero FIFOs.
+
+0.x.53 - 7/23/92
+
+	Fixed range check of AF_TAG_START_AT to allow 0 when NumFrames == 0.
+	This was affecting the AudioSpooler.
+
+0.11.52 - 7/23/92
+New routines added:
+
+Item   CreateDelayLine ( int32 NumBytes , int32 NumChannels, int32 IfLoop);
+	Can be attached to instrument that provide DMA OUT from DSP.  For echoes,
+	reverb, and oscilloscope applications.
+
+int32  DeleteDelayLine( Item DelayLIne );
+
+Item  DefineInsTemplate( uint8 *Definition, int32 NumBytes, Item Device, char *Name );
+	Used to load a template from a .dsp file image that is in RAM. Intended for
+	use with streaming data applications.
+
+Item   DefineSampleHere ( uint8 *AIFFImage, int32 NumBytes, void *(*CustomAllocMem)(), void (*CustomFreeMem)());
+	Used to load a sample from an AIFF image that is in RAM. Intended for
+	use with streaming data applications.
+
+New features:
+	AF_TAG_START_AT  <frame> now supported for sample attachments.
+		This allows you to start a sample in the middle.  Call SetAudioItemInfo()
+		for the attachment before starting the instrument.
+
+	If you don't specify the directory with a -d option when starting the AudioFolio,
+	it will default to "$audio".
+
+Bugs fixed:
+	Data offset in SSND chunks now read properly.  This will probably have
+	no apparent affect.
+
+New DSP instruments:
+	delaymono.dsp
+		Writes Input to an output FIFO.  See ta_customdelay.c for an example.
+
+0.0.50
+Warning: Version numbers out of sequence because we all went to one
+system (not mine). Look at the date to see who is latest.
+
+	General transparent cleanup.
+
+0.0.45
+
+	Release Loop in samples supported.
+
+1.1.41
+	Assumes DAC setup done by ROM.
+	If you have an older green system, you must specify a DAC setup on the
+	command line.  Try:    audiofolio -d/remote -c0xC0020F0F
+	Item cleanup improved.
+
+1.1.40
+	Fixed DSPGetTotalRsrcUsed() for DRSC_TICKS
+	Fixed DINI chunk in .dsp file to allow data initialization
+	Fixed Item ownership for SuperDeleteItem for dependants
+
+1.1.39
+	Fixed Dead Attachment error when attachment deleted
+	before Instrument.
+	Fixed XREF of sample file from 3INS file.
+	Audio Data structures are now private.  Use GetAudioItemInfo()
+	to get information from an Item.  For example, to find out the
+	address of a sample's data:
+/*
+** Get data from sample using by sending a Taglist that gets filled in with the
+** current values.
+*/
+	Tags[0].ta_Tag = AF_TAG_ADDRESS;
+	Tags[0].ta_Arg = NULL;
+	Tags[1].ta_Tag = TAG_END;
+	Result = GetAudioItemInfo(SampleItem, Tags);
+	CHECKRESULT(Result,"GetAudioItemInfo");
+	Data = Tags[0].ta_Arg;
+
+
+1.1.38
+	DSP Tick allocation added.
+	DSP Instruments have ALLOC.TICKS specified.
+	TAGS are now enumerated and compatible with the Tag Processor.
+	Changing sample BaseNote updates BaseFrequency so tuning of scores
+	now works properly.
+
+1.1.36
+	Added ARM access to I memory via SEMAPHORE.
+	This will allow DSP variable initialization and table loading,
+	and envelope presetting.
+
+1.1.35
+	Envelopes fixed.  Envelope can be loaded from 3INS file.
+	Cleaned up dependant Item deletion, ie. Attachments.
+
+1.1.34
+	PARANOID memory check to verify proper allocation and free.
+
+1.1.32
+	Added WhereAttachment.
+	int32 WhereAttachment( Item Attachment )
+	This will give you the byte index of where the current sample
+	attachment is. Starts at zero.  Negative is an error.
+	Does not yet work with Envelopes.
+
+1.1.31
+	Envelopes temporarily broken.
+
+	Supports run-time stack checking in dragon.
+	Stack must be set to at least 3000 before running AudioFolio
+	or audio applications.  Enter  "stack 5000" into shell.
+
+1.1.29
+	Synthetic waveforms now support proper tuning.
+	See ta_tuning.c example.
+	Item  CreateTuning( ufrac16 *Frequencies, int32 NumNotes, int32 NotesPerOctave, int32 BaseNote );
+	int32 DeleteTuning( Item Tuning );
+	int32 TuneInsTemplate( Item InsTemplate, Item Tuning );
+	int32 TuneInstrument( Item Instrument, Item Tuning );
+
+1.1.28
+	Added Envelope support.
+	Item  AttachEnvelope( Item Instrument, Item Envelope, char *EnvName );
+	int32 DetachEnvelope( Item Attachment );
+	Item  CreateEnvelope( DataTimePair *Points, int32 Numpoints,
+			int32 SustainBegin, int32 SustainEnd );
+	int32 DeleteEnvelope( Item Envelope );
+
+1.1.27
+	5/29/93
+	spoolsoundfile.c modified to loop sound files
+	5/28/93
+	Dynamic voice allocation and multisampling for scores added.
+	ScavengeInstrument() added.
+	SetAudioItemInfo() for Samples now returns 0 if OK.
+
+1.1.26
+	Force Silence after attachment if none linked.
+	LinkAttachment can now be called while a sample is playing.
+		If the first Attachment is playing, it will set the link
+		properly to the second attachment.
+
+1.1.25
+	Removed check for NumBytes==0 in Sample Tags because we
+	need this if memory deallocated.
+1.1.24
+	Removed Clicks from Linked Attachments
+1.1.23
+	LoadSampleHere( Name, AllocFUnction, FreeFunction) added.
+1.1.22
+	AdoptInstrument and AbandonInstrument added.
+
+1.1.16   5/6/93  Cardinal 2b
+	Proper reporting of DSP resource allocation failure.
+	Look on 3DO InfoServer for late breaking Audio news and score player docs.
+
+1.1.15   5/4/93  Cardinal Plus
+	Improved handling of DMA to prevent rare collisions. (SBounce fix)
+	Improved tracking of Items so that Attachments and other dependant
+		items are automatically deleted.
+	SampleRate now read for AIFF files.
+
+	playsoundfile.c now uses the signals from linked attachments.
+		This is an improvement over the original design which polled
+		the DMA.
+
+	New example: ta_faders.arm for tweaking an instrument. Try:
+		ta_faders.arm sawfilteredsaw.dsp
+	Use joypad to change fader levels.
+
+	New DSP instruments:
+		fixedmono8.dsp
+		halfmono8.dsp
+		submixer4x2.dsp
+		submixer8x2.dsp
+
+	New MIDI File score playing support in Music Library.
+		Supports 8 bit (44100), 8 bit (22050), compressed (44100), variable 16
+		bit.
+		PIMap supports -f option for fixed sample rate playback for percussion.
+			4 /remote/aiff/tomtom.aiff -f
+
+	New audiodemo.lib with miscellaneous stuff to support demo programs. Includes:
+		easy joypad reading using eventbroker
+		simple graphics tools
+
+1.1.12		3/26/93  Final Cardinal
+	Implemented support for streaming audio. One can now link
+		sample buffers using LinkAttachment.  The following
+		routines now work:
+			LinkAttachment()
+			MonitorAttachment()
+			StartAttachment()
+			ReleaseAttachment()
+			StopAttachment()
+		See ta_attach.arm for an example.
+		This also fixes the click when sampler instruments are released.
+
+1.1.09		3/19/93
+	Changed Loudness to Amplitude
+
+1.1.07		3/12/93  Early Cardinal
+	Many changes to the API and many new routines added.
+	The major areas affected are voice stealing, tuning, sample
+	and envelope control, and instrument control.  Many of these
+	routines are not fully functional but are included to make the
+	intended API explicit.  Please see the Microsoft Word
+	document for details of the API changes.
+	Added Juggler, a hierarchical event playing system
+	that can be used to play MIDI files.
+	See tj_simple.c and tj_multi.j.  This is brand new and
+	is subject to change.
+
+1.1.04		3/11/93
+	UnloadInstrument now unloads the associated template.
+	UnloadInsTemplate now unloads any attached samples.
+
+1.1.03		3/09/93
+	Load compound 3INS instruments with embedded samples.
+
+1.1.02		3/02/93
+	StopInstrument does not set Loudness=0 anymore.  This would cause
+	instruments to go silent if started twice with no tags.
+
+1.1.00		2/11/93
+	Official Magneto6 release.
+	Added error text for SysErr().
+	Updated to be compatible with Magneto6 system.
+	Support for AIFC compressed file formats.
+		SDX2 compressed files can be created using a tool
+		written by Darren Gibbs at 3DO.  These can be played
+		using the dcsqxdmono.dsp instrument.
+
+1.0.23		2/10/93
+	Added Resource Query routines for Aria.
+		int32 DSPGetInsRsrcUsed( Item InstrumentItem, int32 RsrcType );
+		int32 DSPGetTotalRsrcUsed( int32 RsrcType );
+		See ta_printins.c for an example of their use.
+
+1.0.22		2/9/93
+	New Audio Timer based on DSP interrupt runs at 240 Hertz.
+		Rate can be changed.  See audio.h for API.
+		Requires new head.dsp file!
+	Support for AIFC (AIFF-Compressed) files.
+		Recognizes SDX2 compression type.
+	Added ALL_VOICES to audio.h.  Use with ReleaseInstrument()
+		as a VoiceID to release all voices.
+1.0.21
+	LoadSample and LoadInstrument return proper error code.
+
+
+1.0.20
+	Name change:  ofx/*.ofx changed to dsp/*.dsp
+		Please use new names.
+	AudioFolio now uses relative pathnames to find ofx files
+		on startup.  It no longer uses the cdrom.image "/ad".
+
+1.0.19
+	Recompiled with new ARM Compiler because of compiler bug when
+		handling (uint16 *).
+
+1.0.18
+	Add validation to Sample Data addresses.
+	Folio only frees sample data memory when allocated by Folio.
+		Uses asmp_FolioOwns field.
+	AudioSample structure changed. Use char instead of int32
+		for several small fields.
+
+1.0.17
+	AttachSample and DetachSample now take a FIFOName or NULL
+	instead of a SampleIndex.  Previously 0 was passed as an index.
+	If NULL is passed, the sample will be connected to all FIFOs
+	for compatibility with previous versions.  When Detached, NULL
+	causes all attachments for that sample to be detached.
+	This allows us to use multiple samples in an instrument for
+	different purposes, eg. cross modulation.  This change was required
+	to support 3D Sound.
+
+1.0.16
+	Added check for bad relocations in ofx file.  These were caused
+	by the Macintosh converting 0x0A to 0x0D when the file was transferred
+	from the Sun.
+	Added checks for bad FORM size.  This would cause some bad files
+	built on the Iris to be rejected because they were built incorrectly.
+
+1.0.15
+	Removed SoundFile support from folio, moved to music.lib
+	Added ScanSample to Audio Folio and playsoundfile.c example.
+	Fixed DSPP code list manager,
+	Added MakeSample - see ta_makesample.c
+	Makefile use .arm suffix for executables
+	Fixed RBASE allocation to allow more voices.
+	Added playsoundfile.c
+	Added AllocLoudness, FreeLoudness, MakeSample
+	Added GetAudioTime, SleepUntilAudioTime
+	Added mixer8x2.ofx
+	Fixed last channel in mixer4x2.ofx - pipeline error
+	Added fixedmonosample.ofx, fixedstereosample.ofx
+	Added DisconnectInstruments() - see testaudio.c
+	Added GetAudioRate() - see ta_timer.c
+
+	Added experimental score playing ability.  This is
+	a first pass and will certainly change.  Let us know what
+	you want.  To use it, call:
+		stack 20000
+		playmf.arm {midifilename} {psmapfilename}
+	You must increase stack size to 20000 or so to avoid an
+		ugly crash.
+	The midifile must be format0 and is restricted to the
+	first 8 channels.  The psmapfile should contain lines
+	with a program number followed by a sample name. For
+	an example, see: /remote/aiff/default.psmap.  To test
+	this tool, enter:
+		playmf.arm
+	It will default to a simple melody and sample map.
+	See score.h and playmf.c for info.  Very rough at this stage.
+
+1.0.14
+	Runs on Magenta system
+
+1.0.13
+	Tested decompression tool dcsqxdmono.ofx - it works.
+	Added svfilter.ofx, noise.ofx, timesplus.ofx, multiply.ofx.
+	Added support for Playing Sound Files, see new calls below.
+	Renamed SetTrace to TraceAudio.
+		Example:   OldTraceMask = TraceAudio(TRACE_TOP|TRACE_SAMPLE);
+	Sound from multiple tasks' mixers should now mix properly.
+
+uint32 __swi(AUDIOSWI+9) TraceAudio ( int32 Mask );
+	Sets bits to enable/disable diagnostics, see audio.h.
+	TRACE_TOP TRACE_INT TRACE_ITEM TRACE_SAMPLE can be ORed.
+	Use Mask = -1 to get all diagnostics.
+int32 DSPGetRsrcAlloc ( Item InstrumentItem, int32 RsrcType, char *Name, int32 *Alloc);
+	Returns allocated value for resource, eg. DRSC_INFIFO "InFIFO" sets
+	Alloc to allocated DMAChannel
+void *DSPWhereDMA ( uint32 DMAChannel );
+	Returns current DMA pointer for channel.
+Item OpenSoundFile ( char *Name, int32 BufferSize );
+	Reads sound file, sets up for I/O, sets asmp_DataOffset, preloads two buffers.
+int32 ReadSoundFile( Item SampleItem, int32 Cursor, int32 BufIndex);
+	Reads sound into next buffer from byte=Cursor.  Currently too slow.
+int32 CloseSoundFile ( Item SampleItem );
+
+1.0.12
+	Fixed bug in DetachSample that caused crash second time.
+	Use cdrom.image for ofx files. Now have directories:
+	cdrom.image - "/ad/ofx" "/ad/aiff" "/ad/mf"
+	remote - "/remote/ofx" "/remote/aiff" "/remote/mf"
+	/remote is slower but lets you drop files in from Mac side.
+	Better handling of errors in AIFF files.
+	Added decompression instrument dcsqxdmono.ofx - unheard.
+	First release of audiomon.
+	Added ta_longsamp to play forever.
+
+1.0.11
+	Allow multiple DSPP external routines with multiple entry points.
+	Add SetTrace(Level) for debugging. Add LoadInstrument call to
+		replace LoadInsTemplate and AllocInstrument.
+	Changed AttachKnob to GrabKnob, DetachKnob to ReleaseKnob,
+		and PutKnob to TweakKnob.  Add head.ofx and tail.ofx to
+		allow DSP benchmarking.
+
+1.0.10
+	DSPP Resource Allocation and Free implemented.  Eliminates
+	need to restart after every use.  Added ta_randknobs
+
+1.0.6
+	First Release to developers
+	Added ConnectInstruments. Mixers must now be connected explicitly.
+
+1.0.8
+	Use official FileSystem.  Must now ChangeDirectory("/remote")
+	All file I/O moved above fence.
+
+1.0.1
+	Don's and Stan's fixes to match BlueShift, set DAC for Bluto
+
+1.0.0
+	First internal release
+
+--------------------------------------------------------------
+CodeBreakers - these changes will break your code!!!!!!!!!!!!!!!!!!!!
+
+
+20.14.59
+	Audio programs must be relinked with new audio.lib!!!!
+
+20.11.58
+	New optimised DSP instruments will not work with OLD
+	folios.  You do not need to change your code.  Just
+	use NEW DSP files only with new folios.
+
+1.1.29
+	TweakKnob() now converts 16.16 Frequency in Hertz to device rate
+	for synthetic waves such as sawtooth.  Thus the frequency you hear
+	has changed. Use TweakRawKnob() to bypass this conversion process.
+
+1.1.16
+	DSP instruments are designed for Red.  If using Blue hardware, use old
+	dsp folder.
+
+1.1.15
+	MIDI File score player PIMaps now use CarriageReturn instead
+		of LineFeed as a line terminator.
+
+1.1.09
+	Changed all references to Loudness to Amplitude.
+	Loudness refers to a perceptual metric that is logarithmic.
+	Amplitude refers a direct linear metric that is what we
+	actually do.  This was causing much confusion. Thus:
+		GrabKnob(MyIns, "Loudness");   becomes
+		GrabKnob(MyIns, "Amplitude");
+
+		AF_TAG_LOUDNESS becomes AF_TAG_AMPLITUDE
+		MAXDSPLOUDNESS becomes MAXDSPAMPLITUDE
+		AllocLoudness() becomes AllocAmplitude()
+
+1.1.07
+	To better support future hardware devices, and voice allocation,
+	we changed the following:
+		Item  LoadInsTemplate( char *Name, Item AudioDevice);
+	The AudioDevice was changed to an Item, was a string.
+		Item  LoadInstrument( char *Name, Item AudioDevice, uint8 Priority);
+		Item  AllocInstrument( Item InsTemplate, uint8 Priority);
+	The Priority was changed to uint8, was a uint32.
+	The NumVoices parameter was droppped.
+
+	To support the Attachment Item which is used for synchronizing with
+	samples and envelopes, we changed these:
+		Item AttachSample( Item Instrument, Item Sample, char *FIFOName );
+	Now returns an Attachment Item.
+		int32 DetachSample( Item Attachment );
+	Now deletes Attachment Item, different parameters.
+
+	AF_TAG_FREQ replaced by AF_TAG_RATE, new tag AF_TAG_FREQUENCY added.
+
+	In order to provide a more generic, safe and sane, access to
+	Audio Item internal data, we eliminated these routines:
+		GetKnobInfo() and PutSampleInfo()
+	and replaced them with:
+		int32 SetAudioItemInfo( Item AnyItem, TagArg *tp );
+	which sets Item data based on Tags, and
+		int32 GetAudioItemInfo( Item AnyItem, TagArg *tp );
+	which fills in the TagList based on contents of Item.
+
+	Since the Voice allocation is now provided by a set of low level calls,
+	we no longer use the VoiceID parameter.  This parameter was always
+	ignored so we are not losing functionality by taking it away.
+	The following calls are affected.
+		int32 StartInstrument( Item Instrument, TagArg *TagList);
+	Now returns int32, not a VoiceID,
+		int32 ReleaseInstrument( Item Instrument, TagArg *TagList);
+		int32 StopInstrument( Item Instrument, TagArg *TagList);
+	no longer take a VoiceID.
+
+	It is now necessary to run both the file system and the math folio
+	before running the audiofolio.  Enter:
+		fs
+		operamath
+
+1.0.22
+	Old Knob function names now gone. Use GrabKnob(), TweakKnob(),
+		ReleaseKnob().
+	Audio Rate now defaults to 240 ticks/second but you can change it.
+
+1.0.20
+	Instrument templates now called dsp/*.dsp, not ofx/*.ofx.
+
+1.0.17
+	AttachSample and DetachSample now take a FIFOName or NULL.
+	DetachSample must now be called when changing samples.
+
+1.0.15
+	test programs now have ".arm" appended
+	Audio Folio now called audiofolio
+
+1.0.8
+	uses 3DO filesystem, files must be in /remote or a cdrom.image
+
+1.0.6
+	Must connect to mixer or directout to get sound.

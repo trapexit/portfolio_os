@@ -1,0 +1,294 @@
+
+
+Operamath release notes
+-----------------------
+
+15-Sep-94  2.0 release
+----------------------
+
+Added a check in CloseMathFolio to return the BADPTR error when called
+if OpenMathFolio had never been called.
+
+
+14-Sep-94  2.0 release
+----------------------
+
+Fixed a bug in the CompareS64() library routine - wrong values were
+returned when comparing a positive number to a negative number and
+both were near the maximum magnitude causing an overflow.
+
+
+7-Jun-94  Anvil release
+-----------------------
+
+Support for Anvil features has been suppressed.
+
+
+1-Jun-94  Anvil release
+-----------------------
+
+Math folio routines have been updated to take advantage of bug fixes in
+Anvil hardware.  In particular, performances of the routines that perform
+a 3x3 matrix multiply by a vector with a subsequent perspective divide
+are greatly improved.
+
+
+10-May-94  Pre-Anvil
+--------------------
+
+Modified CloseMathFolio() to no longer reset the value of _MathBase.
+
+
+4-May-94  Pre-Anvil
+-------------------
+
+Removed all RED hardware support.
+
+Now query MUD for system configuration information.
+
+Added routine CloseMathFolio() which closes the math folio and resets
+_MathBase to 0 (undoing the effects of the OpenMathFolio() call).
+
+
+22-Apr-94  Pre-Anvil
+--------------------
+
+Removed all calls to printf from operamath.lib .
+
+
+11-Aug-93  Dragontail release
+-----------------------------
+
+Undid yesterday's incorrect fix that caused the MulObjectVec3Mat33_F16
+routine to crash.
+
+Fixed a bug that caused the MulObjectVec4Mat44_F16 routine to crash.
+
+
+
+10-Aug-93  Dragontail release
+-----------------------------
+
+Fixed a bug that caused the MulObjectVec3Mat33_F16 routine to crash.
+
+
+5-Aug-93  Dragontail release
+----------------------------
+
+Fixed a bug in the MulSF30 routine that caused it to just return its
+arguments unaltered.
+
+
+Beta ROM interim release - 13-Jul-93
+------------------------------------
+
+Added copyright notices
+
+
+Dragon1 release (patch) - 17-Jun-93
+---------------------------
+
+Fixed a bug in the MulObjectVec3Mat33_F16() routine.
+
+
+Dragon1 release - 15-Jun-93
+---------------------------
+
+Set the official version and revision numbers to 0 and 0.
+
+Fixed a bug in the Transpose33() and Tranpose44() routines that was
+introduced in the Dragon1 pre-release
+
+Changed the name of FindMathFolio to OpenMathFolio
+
+Changed the global variable MathBase to _MathBase to minimize potential
+namespace collision.
+
+Moved some user mode routines back into the folio (only routines that
+were called by other system folios).
+
+Removed access to the B1 register set in the math hardware.
+
+Inserted patch code in the 3x3 matrix multiply with divide to catch
+hardware errors and recalculate results.
+
+
+Dragon1 pre-release - 11-Jun-93
+-------------------------------
+
+Fixed a bug in the red and green hardware versions of 4x4 matrix routines.
+
+Green support is in.
+
+All user mode routines have moved to the link library.
+
+3x3 and 4x4 matrix routines use full overlap capabilities.
+
+Added the following routines to use concatenated matrix multiply and divide:
+
+/* structure to pass arguments to MulManyVec3Mat33DivZ_F16 routine */
+typedef struct mmv3m33d {
+  vec3f16 *dest;
+  vec3f16 *src;
+  mat33f16 *mat;
+  frac16 n;
+  uint32 count;
+} mmv3m33d;
+
+void MulManyVec3Mat33DivZ_F16 (mmv3m33d *s);
+/* Multiply a 3x3 matrix of 16.16 values by multiple vectors, then multiply x and y by n/z */
+/* Return the result vectors {x*n/z, y*n/z, z} */
+
+void MulVec3Mat33DivZ_F16 (vec3f16 dest, vec3f16 vec, mat33f16 mat, frac16 n);
+/* Multiply a 3x3 matrix of 16.16 values by a vector, then multiply x and y by n/z */
+/* Return the result vector {x*n/z, y*n/z, z} */
+
+Warning:  some of the hardware routines use the B1 register set in the hardware
+which has been declared off-limits (one of the chip sets will have access to
+this register set removed).
+
+Warning:  The API is still going to change a little.  Some of the library routines
+are going to move back into the folio, and some of the SWI routines may move into
+the library.
+
+
+preliminary Dragon1 update - 24-May-93
+--------------------------------------
+
+The Transpose33_F16 and Transpose44_F16 routines had a fatal stack
+handling error, which has been fixed.
+
+First cut at supporting the green hardware is in.
+
+This version will NOT work on the green wire-wrap!
+
+
+Cardinal2b update - 28-Apr-93
+-----------------------------
+
+The 3x3 matrix*matrix routine had a bug when running on blue or green
+hardware which has been fixed.
+
+The 3x3 matrix*matrix and matrix*multiple vector routines have been
+sped up.
+
+
+Interim bug fix release - 9-Apr-93
+----------------------------------
+
+
+The math folio no longer attempts to use the matrix hardware when
+running on the green wire-wrap system.
+
+The software versions of the matrix times matrix routines (used when
+running on blue systems or the green wire-wrap system) now work
+properly when the destination matrix is the same as either of the
+source matrices.
+
+
+Cardinal release - 26-Mar-93
+----------------------------
+
+
+The Operamath folio is now a folio instead of a link library.
+
+The folio needs to be loaded into the target system before any programs
+that make use of it are called.  Some of the other folios might have to
+load after the Operamath folio if they make use of any of its functions.
+
+Any program that uses routines from the Operamath folio should call
+the routine FindMathFolio() before attempting to use any routines from
+the folio.  The routine FindMathFolio attempts to locate the math folio
+and set the global variable MathBase to point to the folio structure.
+If FindMathFolio() fails, it will return a negative number, appropriate
+for printing with the PrintfSysError() function.
+
+New routines have been added to support batch processing of multiplies
+with the matrix hardware.  Some of the routines use the matrix hardware
+when running on Red systems.
+
+There is some amount of overhead in calling a routine that can access
+the hardware.  Some instances of routines may be more efficient if
+software only versions were used instead - for example, calling the
+routine to multply an array of values by another array of values will
+probably only be effective if more than 3 multiplies are going to be
+performed.
+
+
+New routines are:
+
+int32 FindMathFolio (void);
+/* Locate the math folio and set up the global variable MathBase. */
+/* A negative result is returned if an error occurs */
+
+void MulManyVec3Mat33_F16 (vec3f16 *dest, vec3f16 *src, mat33f16 mat, int32 count);
+/* Multiply many vectors by a matrix */
+
+void MulManyVec4Mat44_F16 (vec4f16 *dest, vec4f16 *src, mat44f16 mat, int32 count);
+/* Multiply many vectors by a matrix */
+
+typedef struct ObjOffset1 {
+  int32 oo1_DestArrayPtrOffset;
+  int32 oo1_SrcArrayPtrOffset;
+  int32 oo1_MatOffset;
+  int32 oo1_CountOffset;
+} ObjOffset1;
+
+void MulObjectVec3Mat33_F16 (void *objectlist[], ObjOffset1 *offsetstruct, int32 count);
+/* Multiply many vectors within object structures by a matrix within that object */
+/* structure, and repeat over a number of objects */
+
+void MulObjectVec4Mat44_F16 (void *objectlist[], ObjOffset1 *offsetstruct, int32 count);
+/* Multiply many vectors within object structures by a matrix within that object */
+/* structure, and repeat over a number of objects */
+
+typedef struct ObjOffset2 {
+  int32 oo2_DestMatOffset;
+  int32 oo2_SrcMatOffset;
+} ObjOffset2;
+
+void MulObjectMat33_F16 (void *objectlist[], ObjOffset2 *offsetstruct, mat33f16 mat, int32 count);
+/* Multiply a matrix within an object structure by an external matrix, and repeat */
+/* over a number of objects */
+
+void MulObjectMat44_F16 (void *objectlist[], ObjOffset2 *offsetstruct, mat44f16 mat, int32 count);
+/* Multiply a matrix within an object structure by an external matrix, and repeat */
+/* over a number of objects */
+
+void MulManyF16 (frac16 *dest, frac16 *src1, frac16 *src2, int32 count);
+/* Multiply an array of 16.16 fractions by another array of fractions */
+
+void MulScalarF16 (frac16 *dest, frac16 *src, frac16 scalar, int32 count);
+/* Multiply a 16.16 scalar by an array of 16.16 fractions */
+
+frac16 AbsVec3_F16 (vec3f16 vec);
+/* Return the absolute value (length) of a vector of 16.16 values */
+
+frac16 AbsVec4_F16 (vec4f16 vec);
+/* Return the absolute value (length) of a vector of 16.16 values */
+
+
+The object matrix and vector multiply routines take as an argument a
+structure that defines offsets within objects to the elements that are
+going to be manipulated.
+
+It is assumed that an object structure will have a pointer to an array
+of points associated with the object, a pointer to an array of
+transformed points, a count of the number of points, and an orientation
+matrix or two.  Some more variations on the object transformation
+routines may be added at a later date.
+
+The MulMany function multiplies every element of an array of frac16
+values by the corresponding element in another array of frac16 values,
+and depositing the result in a destination array.
+
+The MulScalar function multiplies every element of an array of frac16
+values by the same value, and stores the result in another array.
+
+
+The assembler interface has changed a bit.  There is a new macro
+LIBCALL which should be used to call any function in the Operamath
+folio.  If the function is a supervisor mode routine, the LIBCALL macro
+will inline a SWI instruction, otherwise it will generate a function
+call and make sure that the label has been IMPORTed once (and only
+once).

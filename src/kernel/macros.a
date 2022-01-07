@@ -1,0 +1,290 @@
+; $Id: macros.a,v 1.2 1994/02/09 02:04:35 limes Exp $
+
+;;;			GLOBALS
+
+;;;; condition code equates needed for some macros
+;;;
+;;;eq			EQU 0
+;;;EQ			EQU 0
+;;;ne			EQU 1
+;;;NE			EQU 1
+;;;cs			EQU 2
+;;;CS			EQU 2
+;;;cc			EQU 3
+;;;CC			EQU 3
+;;;mi			EQU 4
+;;;MI			EQU 4
+;;;pl			EQU 5
+;;;PL			EQU 5
+;;;vs			EQU 6
+;;;VS			EQU 6
+;;;vc			EQU 7
+;;;VC			EQU 7
+;;;hi			EQU 8
+;;;HI			EQU 8
+;;;ls			EQU 9
+;;;LS			EQU 9
+;;;ge			EQU 10
+;;;GE			EQU 10
+;;;lt			EQU 11
+;;;LT			EQU 11
+;;;gt			EQU 12
+;;;GT			EQU 12
+;;;le			EQU 13
+;;;LE			EQU 13
+;;;al			EQU 14
+;;;AL			EQU 14
+;;;nv			EQU 15
+;;;NV			EQU 15
+
+; Macros
+
+;;;		MACRO	WORD
+;;;			DC.B	(?1?)&$ff, (?1?)>>8&$ff, (?1?)>>16&$ff, (?1?)>>24&$ff
+;;;		ENDM
+
+		MACRO
+$label		WORD	$VALUE
+$label		DCD		$VALUE
+		MEND
+
+;;;		MACRO	LD
+;;;			ldr		?1?, [PC, ?2?-*-8]
+;;;		ENDM
+;;;
+;;;		MACRO	LDB
+;;;			ldrb	?1?, [PC, ?2?-*-8]
+;;;		ENDM
+
+;;;		MACRO	ST
+;;;			str		?1?, [PC, ?2?-*-8]
+;;;		ENDM
+;;;			
+;;;		MACRO	STB
+;;;			strb	?1?, [PC, ?2?-*-8]
+;;;		ENDM
+
+;;;		MACRO	NOP
+;;;			mov		R0, R0						; Recommended NOP for ARM
+;;;		ENDM
+
+		MACRO
+$label		NOP
+$label		MOV		R0, R0
+		MEND
+		
+;;;		MACRO	RTS
+;;;			mov		PC, LK
+;;;		ENDM
+
+		MACRO
+$label		RTS
+$label		MOV		PC, LK
+		MEND
+		
+;;;		MACRO	RTSS
+;;;			movs	PC, LK
+;;;		ENDM
+
+		MACRO
+$label		RTSS
+$label		MOVS	PC, LK
+		MEND
+		
+;;;		MACRO	RTI
+;;;			subs	PC, LK, #4
+;;;		ENDM
+
+		MACRO
+$label		RTI
+$label		SUBS	PC, LK, #4
+		MEND
+		
+;;;		MACRO	PUSH
+;;;			stmia	SP!, ?1?
+;;;		ENDM
+		
+;;;		MACRO	POP
+;;;			ldmdb	SP!, ?1?
+;;;		ENDM
+
+;;;		MACRO	PUSHLK
+;;;			stmia	SP!, {LK}
+;;;		ENDM
+		
+;;;		MACRO	POPLK
+;;;			ldmdb	SP!, {LK}
+;;;		ENDM
+		
+;;;		MACRO	POPRTS
+;;;			ldmdb	SP!, {PC}
+;;;		ENDM
+
+		MACRO
+$label		POPRTS
+$label		LDMFD	SP!, {PC}
+		MEND
+		
+;;;		MACRO	LOADCC
+;;;		  IF ?1? = cc
+;;;			ldrcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = eq
+;;;			ldreq	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = ne
+;;;			ldrne	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = cs
+;;;			ldrcs	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = cc
+;;;			ldrcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = mi
+;;;			ldrmi	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = pl
+;;;			ldrpl	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = vs
+;;;			ldrvs	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = vc
+;;;			ldrvc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = hi
+;;;			ldrhi	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = ls
+;;;			ldrls	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = ge
+;;;			ldrge	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = lt
+;;;			ldrlt	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = gt
+;;;			ldrcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = le
+;;;			ldrcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = al
+;;;			ldral	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = nv
+;;;			ldrnv	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		ENDM
+;;;		
+;;;		MACRO	SAVECC
+;;;		  IF ?1? = cc
+;;;			strcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = eq
+;;;			streq	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = ne
+;;;			strne	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = cs
+;;;			strcs	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = cc
+;;;			strcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = mi
+;;;			strmi	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = pl
+;;;			strpl	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = vs
+;;;			strvs	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = vc
+;;;			strvc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = hi
+;;;			strhi	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = ls
+;;;			strls	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = ge
+;;;			strge	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = lt
+;;;			strlt	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = gt
+;;;			strcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = le
+;;;			strcc	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = al
+;;;			stral	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		  IF ?1? = nv
+;;;			strnv	?2?, [?4?, ?3?-?5?]
+;;;		  ENDIF
+;;;		ENDM
+		
+;;;		MACRO	LCONST
+;;;		  IF %A-3
+;;;			ldr		?1?, [R7, ?2?-Constants]
+;;;		  ELSE
+;;;			LOADCC	?1?, ?2?, ?3?, R7, Constants
+;;;		  ENDIF
+;;;		ENDM
+;;;		
+;;;		MACRO	LVAR
+;;;		  IF %A-3
+;;;			ldr		?1?, [R6, ?2?-Variables]
+;;;		  ELSE
+;;;			LOADCC	?1?, ?2?, ?3?, R6, Variables
+;;;		  ENDIF
+;;;		ENDM
+;;;		
+;;;		MACRO	SVAR
+;;;		  IF %A-3
+;;;			str		?1?, [R6, ?2?-Variables]
+;;;		  ELSE
+;;;			SAVECC	?1?, ?2?, ?3?, R6, Variables
+;;;		  ENDIF
+;;;		ENDM
+		
+		MACRO
+$label		LCONST	$REG, $VALUE
+$label		LDR		$REG, [R7, #$VALUE-Constants]
+		MEND
+		
+		MACRO
+$label		LVAR	$REG, $VALUE
+$label		LDR		$REG, [R6, #$VALUE-Variables]
+		MEND
+
+		MACRO
+$label		SVAR	$REG, $VALUE
+$label		STR		$REG, [R6, #$VALUE-Variables]
+		MEND
+
+;;;		MACRO	ALIGN
+;;;			ds.b	(0-*)&(?1?-1)
+;;;		ENDM
+;;;		
+;;;		MACRO	WORDALIGN
+;;;			ds.b	(0-*)&3
+;;;		ENDM
+		
+
+		MACRO
+$label		PROC
+$label
+		MEND
+		
+			END
+
