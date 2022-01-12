@@ -1,0 +1,7 @@
+*.txt		text
+*.[chsi]	text
+*.asm		text
+*.md		text
+GNUmakefile*	text
+
+*.a		-text
